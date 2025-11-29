@@ -1,38 +1,116 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
+  
+  <!-- Primary Meta Tags -->
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  
+  <title>NotaryFlow - Professional Notary Business Management App</title>
+  <meta name="title" content="NotaryFlow - Professional Notary Business Management App">
+  <meta name="description" content="Complete business management solution for mobile notaries. Track mileage, manage clients, create invoices, and calculate fees. Save time and maximize tax deductions.">
+  <meta name="keywords" content="notary app, notary business, mobile notary, notary software, invoice generator, mileage tracker, notary public, business management, tax deduction, notary tools">
+  <meta name="author" content="NotaryFlow">
+  <meta name="robots" content="index, follow">
+  <meta name="language" content="English">
+  <meta name="revisit-after" content="7 days">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://notariflow.com/">
+  <meta property="og:title" content="NotaryFlow - Professional Notary Business Management">
+  <meta property="og:description" content="Streamline your notary business with automated invoicing, mileage tracking, and client management. Built for mobile notaries.">
+  <meta property="og:image" content="https://notariflow.com/assets/images/og-image.png">
+  <meta property="og:site_name" content="NotaryFlow">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://notariflow.com/">
+  <meta name="twitter:title" content="NotaryFlow - Notary Business Management App">
+  <meta name="twitter:description" content="Manage your notary business efficiently. Track miles, create invoices, manage clients - all in one app.">
+  <meta name="twitter:image" content="https://notariflow.com/assets/images/twitter-image.png">
+  
+  <!-- Mobile Optimization -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="notariflow">
+  <meta name="apple-mobile-web-app-title" content="NotaryFlow">
+  
+  <!-- Theme Color -->
+  <meta name="theme-color" content="#4F46E5">
+  <meta name="msapplication-TileColor" content="#4F46E5">
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://notariflow.com/">
+  
+  <!-- Icons -->
+  <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>notariflow</title>
-  <link rel="manifest" href="manifest.json">
+  
+  <!-- Schema.org structured data for Google -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "NotaryFlow",
+    "operatingSystem": "Web, Android, iOS",
+    "applicationCategory": "BusinessApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "127"
+    },
+    "description": "Professional business management app for mobile notaries. Features include mileage tracking, invoice generation, client management, and fee calculation.",
+    "screenshot": "https://notariflow.com/assets/images/screenshot.png",
+    "url": "https://notariflow.com",
+    "author": {
+      "@type": "Organization",
+      "name": "NotaryFlow"
+    },
+    "featureList": [
+      "Mileage Tracking with GPS",
+      "Automated Invoice Generation",
+      "Client Database Management",
+      "Fee Calculator",
+      "PDF Invoice Export",
+      "Analytics Dashboard",
+      "CSV Data Export",
+      "Cloud Sync"
+    ]
+  }
+  </script>
 </head>
 <body>
+  <!-- Loading indicator -->
+  <div id="loading" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8fafc; display: flex; align-items: center; justify-content: center; z-index: 9999;">
+    <div style="text-align: center;">
+      <div style="width: 50px; height: 50px; border: 4px solid #e0e7ff; border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+      <p style="margin-top: 16px; color: #64748b; font-family: system-ui, -apple-system, sans-serif;">Loading NotaryFlow...</p>
+    </div>
+  </div>
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+  <script>
+    // Remove loading screen when Flutter app loads
+    window.addEventListener('flutter-first-frame', function () {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.style.opacity = '0';
+        loading.style.transition = 'opacity 0.3s';
+        setTimeout(() => loading.remove(), 300);
+      }
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

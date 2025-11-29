@@ -4,9 +4,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:csv/csv.dart';
+import 'package:universal_html/html.dart' as html;
+import 'screens/calendar_screen.dart';
+import 'screens/journal_screen.dart';
 
 // --- CONFIGURATION ---
-// Firebase Configuration for NotariFlow
 const firebaseOptions = FirebaseOptions(
   apiKey: "AIzaSyCUYfhXTvTL9XGImXm3DOrMeM4iOQF8aLs",
   authDomain: "notariflow.firebaseapp.com",
@@ -18,17 +25,11 @@ const firebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase for Web (and fallback for mobile if config files aren't generated)
   try {
-    await Firebase.initializeApp(
-      options: firebaseOptions,
-    );
+    await Firebase.initializeApp(options: firebaseOptions);
   } catch (e) {
-    // If already initialized or using google-services.json
     await Firebase.initializeApp();
   }
-
   runApp(const NotaryFlowApp());
 }
 
@@ -42,7 +43,7 @@ class NotaryFlowApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC), // Slate-50
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         useMaterial3: true,
         cardTheme: CardThemeData(
           surfaceTintColor: Colors.white,
@@ -56,26 +57,8 @@ class NotaryFlowApp extends StatelessWidget {
 }
 
 // --- AUTH WRAPPER ---
-class AuthWrapper extends StatefulWidget {
+class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
-
-  @override
-  State<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends State<AuthWrapper> {
-  @override
-  void initState() {
-    super.initState();
-    _signIn();
-  }
-
-  Future<void> _signIn() async {
-    // Auto-sign in anonymously for MVP
-    if (FirebaseAuth.instance.currentUser == null) {
-      await FirebaseAuth.instance.signInAnonymously();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,15 +71,357 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (snapshot.hasData) {
           return const MainLayout();
         }
-        return const Scaffold(
-          body: Center(child: Text("Authenticating secure session...")),
-        );
+        return const LoginScreen();
       },
     );
   }
 }
 
-// --- MAIN LAYOUT (RESPONSIVE) ---
+// --- LOGIN SCREEN ---
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed';
+      if (e.code == 'user-not-found') {
+        message = 'No account found with this email';
+      } else if (e.code == 'wrong-password') {
+        message = 'Incorrect password';
+      } else if (e.code == 'invalid-email') {
+        message = 'Invalid email address';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Card(
+              elevation: 8,
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.work, size: 64, color: Colors.indigo),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'NotaryFlow',
+                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Professional Notary Management',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 32),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Required';
+                          if (!value.contains('@')) return 'Invalid email';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                        obscureText: _obscurePassword,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Required';
+                          if (value.length < 6) return 'At least 6 characters';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Login', style: TextStyle(fontSize: 16)),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text("Don't have an account?"),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const SignupScreen()),
+                              );
+                            },
+                            child: const Text('Sign Up'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- SIGNUP SCREEN ---
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
+
+  @override
+  State<SignupScreen> createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends State<SignupScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  Future<void> _signup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+
+      await credential.user!.updateDisplayName(_nameCtrl.text.trim());
+
+      // Create initial profile
+      await FirebaseFirestore.instance
+          .doc('artifacts/notaryflow-v2/users/${credential.user!.uid}/profile/business_info')
+          .set({
+        'businessName': _nameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'Signup failed';
+      if (e.code == 'weak-password') {
+        message = 'Password is too weak';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'Email already in use';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create Account'),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Card(
+              elevation: 8,
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Sign Up',
+                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Business Name',
+                          prefixIcon: Icon(Icons.business),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return 'Required';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Required';
+                          if (!value.contains('@')) return 'Invalid email';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                        obscureText: _obscurePassword,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Required';
+                          if (value.length < 6) return 'At least 6 characters';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _confirmPasswordCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscureConfirm ? Icons.visibility : Icons.visibility_off),
+                            onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                          ),
+                        ),
+                        obscureText: _obscureConfirm,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Required';
+                          if (value != _passwordCtrl.text) return 'Passwords do not match';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _signup,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Create Account', style: TextStyle(fontSize: 16)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- MAIN LAYOUT ---
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
@@ -106,10 +431,12 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
-  final String _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   final List<Widget> _screens = [
     const DashboardScreen(),
+    const AnalyticsScreen(),
+    const CalendarScreen(),
+    const JournalScreen(),
     const MileageScreen(),
     const InvoicesScreen(),
     const ClientsScreen(),
@@ -117,9 +444,23 @@ class _MainLayoutState extends State<MainLayout> {
     const SettingsScreen(),
   ];
 
+  String _getScreenTitle(int index) {
+    switch (index) {
+      case 0: return 'Dashboard';
+      case 1: return 'Analytics';
+      case 2: return 'Schedule';
+      case 3: return 'Journal';
+      case 4: return 'Mileage Tracker';
+      case 5: return 'Invoices';
+      case 6: return 'Clients';
+      case 7: return 'Fee Estimator';
+      case 8: return 'Settings';
+      default: return 'NotaryFlow';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Use LayoutBuilder to switch between Mobile (BottomNav) and Desktop (SideNav)
     return LayoutBuilder(
       builder: (context, constraints) {
         bool isWide = constraints.maxWidth > 800;
@@ -131,7 +472,7 @@ class _MainLayoutState extends State<MainLayout> {
                 NavigationRail(
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: (int index) => setState(() => _selectedIndex = index),
-                  backgroundColor: const Color(0xFF0F172A), // Slate-900
+                  backgroundColor: const Color(0xFF0F172A),
                   indicatorColor: Colors.indigo,
                   selectedIconTheme: const IconThemeData(color: Colors.white),
                   unselectedIconTheme: const IconThemeData(color: Colors.grey),
@@ -150,6 +491,9 @@ class _MainLayoutState extends State<MainLayout> {
                   ),
                   destinations: const [
                     NavigationRailDestination(icon: Icon(Icons.dashboard), label: Text('Dashboard')),
+                    NavigationRailDestination(icon: Icon(Icons.analytics), label: Text('Analytics')),
+                    NavigationRailDestination(icon: Icon(Icons.calendar_month), label: Text('Schedule')),
+                    NavigationRailDestination(icon: Icon(Icons.book), label: Text('Journal')),
                     NavigationRailDestination(icon: Icon(Icons.directions_car), label: Text('Mileage')),
                     NavigationRailDestination(icon: Icon(Icons.attach_money), label: Text('Invoices')),
                     NavigationRailDestination(icon: Icon(Icons.people), label: Text('Clients')),
@@ -160,7 +504,6 @@ class _MainLayoutState extends State<MainLayout> {
               Expanded(
                 child: Column(
                   children: [
-                    // Header
                     Container(
                       color: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -171,15 +514,38 @@ class _MainLayoutState extends State<MainLayout> {
                             _getScreenTitle(_selectedIndex),
                             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
-                          const CircleAvatar(
-                            backgroundColor: Colors.indigo,
-                            child: Icon(Icons.person, color: Colors.white),
+                          PopupMenuButton<String>(
+                            child: CircleAvatar(
+                              backgroundColor: Colors.indigo,
+                              child: Text(
+                                (FirebaseAuth.instance.currentUser?.displayName ?? 'U')[0].toUpperCase(),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            itemBuilder: (context) => <PopupMenuEntry<String>>[
+                              PopupMenuItem(
+                                child: Text(FirebaseAuth.instance.currentUser?.email ?? ''),
+                                enabled: false,
+                              ),
+                              const PopupMenuDivider(),
+                              PopupMenuItem(
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.logout, size: 20),
+                                    SizedBox(width: 12),
+                                    Text('Logout'),
+                                  ],
+                                ),
+                                onTap: () async {
+                                  await FirebaseAuth.instance.signOut();
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                     const Divider(height: 1),
-                    // Content
                     Expanded(child: _screens[_selectedIndex]),
                   ],
                 ),
@@ -195,111 +561,121 @@ class _MainLayoutState extends State<MainLayout> {
                   selectedItemColor: Colors.indigo,
                   unselectedItemColor: Colors.grey,
                   items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dash'),
-                    BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Miles'),
-                    BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: 'Inv'),
+                    BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+                    BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'Analytics'),
+                    BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Schedule'),
+                    BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Journal'),
+                    BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Mileage'),
+                    BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: 'Invoices'),
                     BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Clients'),
-                    BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'Fee'),
-                    BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Set'),
+                    BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'Estimator'),
+                    BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
                   ],
                 ),
         );
       },
     );
   }
-
-  String _getScreenTitle(int index) {
-    switch (index) {
-      case 0: return 'Dashboard';
-      case 1: return 'Mileage Tracker';
-      case 2: return 'Invoices';
-      case 3: return 'Client Rolodex';
-      case 4: return 'Fee Estimator';
-      case 5: return 'Settings';
-      default: return 'NotaryFlow';
-    }
-  }
 }
 
-// --- 1. DASHBOARD SCREEN ---
+// --- DASHBOARD (QUICK STATS) ---
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final Stream<QuerySnapshot> invoiceStream = FirebaseFirestore.instance
-        .collection('artifacts/notaryflow-v2/users/$uid/invoices')
-        .snapshots();
-    final Stream<QuerySnapshot> tripStream = FirebaseFirestore.instance
-        .collection('artifacts/notaryflow-v2/users/$uid/trips')
-        .snapshots();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: StreamBuilder(
-        stream: invoiceStream,
-        builder: (context, invSnapshot) {
-          return StreamBuilder(
-            stream: tripStream,
-            builder: (context, tripSnapshot) {
-              if (!invSnapshot.hasData || !tripSnapshot.hasData) return const LinearProgressIndicator();
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/invoices')
+          .snapshots(),
+      builder: (context, invSnapshot) {
+        return StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('artifacts/notaryflow-v2/users/$uid/trips')
+              .snapshots(),
+          builder: (context, tripSnapshot) {
+            if (!invSnapshot.hasData || !tripSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-              final invoices = invSnapshot.data!.docs;
-              final trips = tripSnapshot.data!.docs;
+            final invoices = invSnapshot.data!.docs;
+            final trips = tripSnapshot.data!.docs;
 
-              double totalIncome = 0;
-              double pendingIncome = 0;
-              for (var doc in invoices) {
-                totalIncome += (doc['amount'] as num).toDouble();
-                if (doc['status'] == 'Pending') pendingIncome += (doc['amount'] as num).toDouble();
-              }
+            double totalIncome = 0;
+            double pendingIncome = 0;
+            double paidIncome = 0;
 
-              double totalMiles = 0;
-              for (var doc in trips) {
-                totalMiles += (doc['miles'] as num).toDouble();
-              }
-              double taxDed = totalMiles * 0.67;
+            for (var doc in invoices) {
+              final amount = (doc['amount'] as num).toDouble();
+              totalIncome += amount;
+              if (doc['status'] == 'Pending') pendingIncome += amount;
+              if (doc['status'] == 'Paid') paidIncome += amount;
+            }
 
-              return Column(
+            double totalMiles = 0;
+            for (var doc in trips) {
+              totalMiles += (doc['miles'] as num).toDouble();
+            }
+            double taxDed = totalMiles * 0.67;
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  // Stats Row
                   Wrap(
                     spacing: 16,
                     runSpacing: 16,
                     children: [
-                      _StatCard(title: "Revenue", value: "\$${totalIncome.toStringAsFixed(2)}", icon: Icons.attach_money, color: Colors.green),
+                      _StatCard(title: "Total Revenue", value: "\$${totalIncome.toStringAsFixed(2)}", icon: Icons.attach_money, color: Colors.green),
+                      _StatCard(title: "Paid", value: "\$${paidIncome.toStringAsFixed(2)}", icon: Icons.check_circle, color: Colors.blue),
                       _StatCard(title: "Pending", value: "\$${pendingIncome.toStringAsFixed(2)}", icon: Icons.access_time, color: Colors.orange),
-                      _StatCard(title: "Deductions", value: "\$${taxDed.toStringAsFixed(2)}", icon: Icons.directions_car, color: Colors.blue),
+                      _StatCard(title: "Tax Deductions", value: "\$${taxDed.toStringAsFixed(2)}", icon: Icons.directions_car, color: Colors.purple),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  // Recent Activity
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Recent Invoices", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Text("Recent Invoices", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 16),
-                          if (invoices.isEmpty) const Text("No invoices found."),
-                          ...invoices.take(5).map((doc) => ListTile(
-                            leading: const CircleAvatar(child: Icon(Icons.receipt)),
-                            title: Text(doc['description'] ?? 'Unknown'),
-                            subtitle: Text(doc['date'] ?? ''),
-                            trailing: Text("\$${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                          )),
+                          if (invoices.isEmpty)
+                            _EmptyState(
+                              icon: Icons.receipt_long,
+                              title: "No invoices yet",
+                              message: "Create your first invoice to get started!",
+                            )
+                          else
+                            ...invoices.take(5).map((doc) => ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.indigo.shade50,
+                                child: const Icon(Icons.receipt, color: Colors.indigo),
+                              ),
+                              title: Text(doc['description'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600)),
+                              subtitle: Text(doc['date'] ?? ''),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text("\$${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  _StatusBadge(status: doc['status']),
+                                ],
+                              ),
+                            )),
                         ],
                       ),
                     ),
                   ),
                 ],
-              );
-            },
-          );
-        },
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -312,25 +688,273 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 300,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
-      child: Row(
-        children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          ])),
-          Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: color, size: 28)),
-        ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 350),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// --- 2. MILEAGE SCREEN ---
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (status) {
+      case 'Paid':
+        color = Colors.green;
+        break;
+      case 'Overdue':
+        color = Colors.red;
+        break;
+      default:
+        color = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// --- ANALYTICS SCREEN ---
+class AnalyticsScreen extends StatefulWidget {
+  const AnalyticsScreen({super.key});
+
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/invoices')
+          .orderBy('date')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final invoices = snapshot.data!.docs;
+
+        if (invoices.isEmpty) {
+          return _EmptyState(
+            icon: Icons.analytics,
+            title: "No data yet",
+            message: "Create invoices to see analytics",
+          );
+        }
+
+        // Group by month
+        Map<String, double> monthlyRevenue = {};
+        Map<String, int> statusCounts = {'Paid': 0, 'Pending': 0, 'Overdue': 0};
+
+        for (var doc in invoices) {
+          final date = doc['date'] as String;
+          final amount = (doc['amount'] as num).toDouble();
+          final status = doc['status'] as String;
+
+          // Extract month (e.g., "2025-01")
+          final monthKey = date.substring(0, 7);
+          monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] ?? 0) + amount;
+
+          statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+        }
+
+        // Sort months
+        final sortedMonths = monthlyRevenue.keys.toList()..sort();
+        final revenueData = sortedMonths.map((month) => monthlyRevenue[month]!).toList();
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Revenue Trend", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    height: 250,
+                    child: LineChart(
+                      LineChartData(
+                        gridData: FlGridData(show: true),
+                        titlesData: FlTitlesData(
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, meta) {
+                                if (value.toInt() >= 0 && value.toInt() < sortedMonths.length) {
+                                  return Text(
+                                    sortedMonths[value.toInt()].substring(5),
+                                    style: const TextStyle(fontSize: 10),
+                                  );
+                                }
+                                return const Text('');
+                              },
+                              reservedSize: 30,
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 50,
+                              getTitlesWidget: (value, meta) {
+                                return Text('\$${value.toInt()}', style: const TextStyle(fontSize: 10));
+                              },
+                            ),
+                          ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                        borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.shade300)),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: revenueData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
+                            isCurved: true,
+                            color: Colors.indigo,
+                            barWidth: 3,
+                            dotData: const FlDotData(show: true),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              color: Colors.indigo.withOpacity(0.1),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Text("Invoice Status Distribution", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    height: 250,
+                    child: PieChart(
+                      PieChartData(
+                        sections: [
+                          PieChartSectionData(
+                            value: statusCounts['Paid']!.toDouble(),
+                            title: '${statusCounts['Paid']}',
+                            color: Colors.green,
+                            radius: 100,
+                            titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          PieChartSectionData(
+                            value: statusCounts['Pending']!.toDouble(),
+                            title: '${statusCounts['Pending']}',
+                            color: Colors.orange,
+                            radius: 100,
+                            titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          PieChartSectionData(
+                            value: statusCounts['Overdue']!.toDouble(),
+                            title: '${statusCounts['Overdue']}',
+                            color: Colors.red,
+                            radius: 100,
+                            titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _LegendItem(color: Colors.green, label: 'Paid'),
+                  _LegendItem(color: Colors.orange, label: 'Pending'),
+                  _LegendItem(color: Colors.red, label: 'Overdue'),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendItem({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+// --- MILEAGE SCREEN ---
 class MileageScreen extends StatefulWidget {
   const MileageScreen({super.key});
 
@@ -339,92 +963,210 @@ class MileageScreen extends StatefulWidget {
 }
 
 class _MileageScreenState extends State<MileageScreen> {
-  bool _isTracking = false;
-  int _seconds = 0;
-  Timer? _timer;
-  final TextEditingController _milesCtrl = TextEditingController();
-  final TextEditingController _purposeCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _locationCtrl = TextEditingController();
+  final _milesCtrl = TextEditingController();
+  final _purposeCtrl = TextEditingController();
 
-  void _toggleTracking() {
-    if (_isTracking) {
-      _timer?.cancel();
-    } else {
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() => _seconds++);
-      });
-    }
-    setState(() => _isTracking = !_isTracking);
+  bool _isTracking = false;
+  bool _showForm = false;
+  DateTime? _startTime;
+  bool _isSaving = false;
+
+  void _startTrip() {
+    setState(() {
+      _isTracking = true;
+      _startTime = DateTime.now();
+    });
+  }
+
+  void _stopTrip() {
+    setState(() {
+      _isTracking = false;
+      _showForm = true;
+    });
   }
 
   Future<void> _saveTrip() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    await FirebaseFirestore.instance.collection('artifacts/notaryflow-v2/users/$uid/trips').add({
-      'miles': double.tryParse(_milesCtrl.text) ?? 0.0,
-      'purpose': _purposeCtrl.text,
-      'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-      'duration': _seconds,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    _milesCtrl.clear();
-    _purposeCtrl.clear();
-    setState(() => _seconds = 0);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trip Saved!")));
-  }
+    if (!_formKey.currentState!.validate()) return;
 
-  String _formatTime(int s) {
-    final duration = Duration(seconds: s);
-    return duration.toString().split('.').first.padLeft(8, "0");
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      await FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/trips')
+          .add({
+        'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'location': _locationCtrl.text.trim(),
+        'miles': double.parse(_milesCtrl.text),
+        'purpose': _purposeCtrl.text.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      _locationCtrl.clear();
+      _milesCtrl.clear();
+      _purposeCtrl.clear();
+
+      setState(() => _showForm = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Row(children: [Icon(Icons.check, color: Colors.white), SizedBox(width: 8), Text('Trip saved!')]), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.indigo.withOpacity(0.1), blurRadius: 20)]),
-            child: Column(
-              children: [
-                Text(_formatTime(_seconds), style: const TextStyle(fontSize: 48, fontFamily: 'Monospace', fontWeight: FontWeight.bold)),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: _toggleTracking,
-                  icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
-                  label: Text(_isTracking ? "STOP TRIP" : "START TRIP"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isTracking ? Colors.red : Colors.indigo,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/trips')
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final trips = snapshot.data!.docs;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Card(
+                color: _isTracking ? Colors.green.shade50 : Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    children: [
+                      Icon(_isTracking ? Icons.location_on : Icons.location_off, size: 64, color: _isTracking ? Colors.green : Colors.grey),
+                      const SizedBox(height: 16),
+                      Text(
+                        _isTracking ? "Tracking Active" : "Not Tracking",
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _isTracking ? Colors.green : Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _isTracking ? _stopTrip : _startTrip,
+                        icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
+                        label: Text(_isTracking ? "Stop Trip" : "Start Trip"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isTracking ? Colors.red : Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+              if (_showForm) ...[
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Log Trip", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _locationCtrl,
+                            decoration: const InputDecoration(labelText: "Location/Client Name", border: OutlineInputBorder()),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _milesCtrl,
+                            decoration: const InputDecoration(labelText: "Miles", border: OutlineInputBorder()),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Required';
+                              final miles = double.tryParse(v);
+                              if (miles == null || miles <= 0) return 'Enter valid miles';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _purposeCtrl,
+                            decoration: const InputDecoration(labelText: "Purpose", border: OutlineInputBorder()),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _isSaving ? null : _saveTrip,
+                                  child: _isSaving
+                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : const Text("Save Trip"),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () => setState(() => _showForm = false),
+                                child: const Text("Cancel"),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
               ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          if (!_isTracking && _seconds > 0 || !_isTracking) 
-             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    TextField(controller: _milesCtrl, decoration: const InputDecoration(labelText: "Miles Driven", suffixText: "mi"), keyboardType: TextInputType.number),
-                    TextField(controller: _purposeCtrl, decoration: const InputDecoration(labelText: "Purpose")),
-                    const SizedBox(height: 16),
-                    SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _saveTrip, child: const Text("Save Trip Log"))),
-                  ],
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Trip History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      if (trips.isEmpty)
+                        _EmptyState(
+                          icon: Icons.directions_car,
+                          title: "No trips yet",
+                          message: "Start tracking your mileage",
+                        )
+                      else
+                        ...trips.map((doc) => ListTile(
+                          leading: const CircleAvatar(child: Icon(Icons.location_on)),
+                          title: Text(doc['location'], style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text("${doc['purpose']} • ${doc['date']}"),
+                          trailing: Text("${doc['miles']} mi", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        )),
+                    ],
+                  ),
                 ),
               ),
-            ),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-// --- 3. INVOICE SCREEN ---
+// --- INVOICES SCREEN ---
 class InvoicesScreen extends StatefulWidget {
   const InvoicesScreen({super.key});
 
@@ -433,159 +1175,774 @@ class InvoicesScreen extends StatefulWidget {
 }
 
 class _InvoicesScreenState extends State<InvoicesScreen> {
-  // Simple state for the form dialog
-  final _amountCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  String? _selectedClientId;
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
 
-  void _showAddDialog(List<QueryDocumentSnapshot> clients) {
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text("New Invoice"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<String>(
-            value: _selectedClientId,
-            hint: const Text("Select Client"),
-            items: clients.map((c) => DropdownMenuItem(value: c.id, child: Text(c['name']))).toList(),
-            onChanged: (v) => setState(() => _selectedClientId = v),
-          ),
-          TextField(controller: _amountCtrl, decoration: const InputDecoration(labelText: "Amount"), keyboardType: TextInputType.number),
-          TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: "Description")),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
-        ElevatedButton(onPressed: () async {
-          if (_selectedClientId == null) return;
-          final uid = FirebaseAuth.instance.currentUser!.uid;
-          await FirebaseFirestore.instance.collection('artifacts/notaryflow-v2/users/$uid/invoices').add({
-            'clientId': _selectedClientId,
-            'amount': double.tryParse(_amountCtrl.text) ?? 0.0,
-            'description': _descCtrl.text,
-            'status': 'Pending',
-            'date': DateFormat('MM/dd/yyyy').format(DateTime.now()),
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-          _amountCtrl.clear(); _descCtrl.clear();
-          if (mounted) Navigator.pop(ctx);
-        }, child: const Text("Create")),
-      ],
-    ));
+  Future<void> _exportCSV(List<QueryDocumentSnapshot> invoices) async {
+    List<List<dynamic>> rows = [
+      ['Date', 'Client', 'Description', 'Amount', 'Status'],
+      ...invoices.map((doc) => [
+        doc['date'],
+        doc['clientName'] ?? 'N/A',
+        doc['description'],
+        doc['amount'],
+        doc['status'],
+      ]),
+    ];
+
+    String csv = const ListToCsvConverter().convert(rows);
+    final bytes = html.Blob([csv], 'text/csv');
+    final url = html.Url.createObjectUrlFromBlob(bytes);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', 'invoices_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CSV exported!'), backgroundColor: Colors.green),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    return StreamBuilder(
-      stream: FirebaseFirestore.instance.collection('artifacts/notaryflow-v2/users/$uid/clients').snapshots(),
-      builder: (context, clientSnap) {
-        return StreamBuilder(
-          stream: FirebaseFirestore.instance.collection('artifacts/notaryflow-v2/users/$uid/invoices').orderBy('createdAt', descending: true).snapshots(),
-          builder: (context, invSnap) {
-            if (!clientSnap.hasData || !invSnap.hasData) return const Center(child: CircularProgressIndicator());
-            
-            final clients = clientSnap.data!.docs;
-            final invoices = invSnap.data!.docs;
 
-            return Scaffold(
-              backgroundColor: Colors.transparent,
-              floatingActionButton: FloatingActionButton(
-                onPressed: () => _showAddDialog(clients),
-                backgroundColor: Colors.indigo,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-              body: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: invoices.length,
-                itemBuilder: (ctx, i) {
-                  final inv = invoices[i];
-                  // Find client name logic omitted for brevity, would usually do a lookup map
-                  return Card(
-                    child: ListTile(
-                      title: Text(inv['description']),
-                      subtitle: Text("Date: ${inv['date']} • Status: ${inv['status']}"),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text("\$${inv['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          IconButton(
-                            icon: const Icon(Icons.print, color: Colors.indigo),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("PDF Generation would open here.")));
-                            },
-                          )
-                        ],
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/invoices')
+          .orderBy('date', descending: true)
+          .snapshots(),
+      builder: (context, invSnapshot) {
+        return StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('artifacts/notaryflow-v2/users/$uid/clients')
+              .snapshots(),
+          builder: (context, clientSnapshot) {
+            if (!invSnapshot.hasData || !clientSnapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final clients = clientSnapshot.data!.docs;
+            Map<String, String> clientMap = {for (var c in clients) c.id: c['name']};
+
+            var invoices = invSnapshot.data!.docs;
+
+            // Filter by search
+            if (_searchQuery.isNotEmpty) {
+              invoices = invoices.where((doc) {
+                final clientName = clientMap[doc['clientId']] ?? '';
+                final desc = doc['description'] ?? '';
+                final amount = doc['amount'].toString();
+                final query = _searchQuery.toLowerCase();
+                return clientName.toLowerCase().contains(query) ||
+                    desc.toLowerCase().contains(query) ||
+                    amount.contains(query);
+              }).toList();
+            }
+
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Search invoices...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            filled: true,
+                            fillColor: Colors.white,
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                          ),
+                          onChanged: (value) => setState(() => _searchQuery = value),
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: invoices.isEmpty ? null : () => _exportCSV(invoices),
+                        icon: const Icon(Icons.file_download),
+                        tooltip: 'Export CSV',
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () => _showInvoiceDialog(context, null, clientMap),
+                        icon: const Icon(Icons.add),
+                        label: const Text("Add Invoice"),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: invoices.isEmpty
+                      ? _EmptyState(
+                          icon: Icons.receipt_long,
+                          title: _searchQuery.isEmpty ? "No invoices yet" : "No matching invoices",
+                          message: _searchQuery.isEmpty ? "Create your first invoice" : "Try a different search",
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: invoices.length,
+                          itemBuilder: (context, i) {
+                            final doc = invoices[i];
+                            final clientName = clientMap[doc['clientId']] ?? 'Unknown Client';
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: const CircleAvatar(child: Icon(Icons.receipt)),
+                                title: Text(clientName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text("${doc['description']} • ${doc['date']}"),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text("\$${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        _StatusBadge(status: doc['status']),
+                                      ],
+                                    ),
+                                    PopupMenuButton(
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf), SizedBox(width: 8), Text('Generate PDF')])),
+                                        const PopupMenuItem(value: 'status', child: Row(children: [Icon(Icons.edit), SizedBox(width: 8), Text('Change Status')])),
+                                        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_note), SizedBox(width: 8), Text('Edit')])),
+                                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                                      ],
+                                      onSelected: (value) async {
+                                        if (value == 'pdf') {
+                                          await _generatePDF(doc, clientName);
+                                        } else if (value == 'status') {
+                                          _showStatusDialog(context, doc);
+                                        } else if (value == 'edit') {
+                                          _showInvoiceDialog(context, doc, clientMap);
+                                        } else if (value == 'delete') {
+                                          _deleteInvoice(context, doc);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             );
           },
         );
       },
     );
   }
+
+  Future<void> _generatePDF(QueryDocumentSnapshot invoice, String clientName) async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final businessDoc = await FirebaseFirestore.instance
+        .doc('artifacts/notaryflow-v2/users/$uid/profile/business_info')
+        .get();
+
+    final businessName = businessDoc.data()?['businessName'] ?? 'NotaryFlow Business';
+    final businessEmail = businessDoc.data()?['email'] ?? '';
+    final businessPhone = businessDoc.data()?['phone'] ?? '';
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('INVOICE', style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('From:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text(businessName),
+                      if (businessEmail.isNotEmpty) pw.Text(businessEmail),
+                      if (businessPhone.isNotEmpty) pw.Text(businessPhone),
+                    ],
+                  ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('To:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text(clientName),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 30),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Date:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(invoice['date']),
+                ],
+              ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Status:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  pw.Text(invoice['status']),
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Divider(),
+              pw.SizedBox(height: 20),
+              pw.Text('Description:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+              pw.Text(invoice['description']),
+              pw.SizedBox(height: 30),
+              pw.Divider(),
+              pw.SizedBox(height: 10),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('TOTAL:', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('\$${invoice['amount']}', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final bytes = await pdf.save();
+    final blob = html.Blob([bytes], 'application/pdf');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', 'invoice_${invoice['date']}_$clientName.pdf')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PDF generated!'), backgroundColor: Colors.green),
+      );
+    }
+  }
+
+  void _showStatusDialog(BuildContext context, QueryDocumentSnapshot invoice) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change Invoice Status'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: ['Pending', 'Paid', 'Overdue'].map((status) {
+            return ListTile(
+              title: Text(status),
+              leading: Radio<String>(
+                value: status,
+                groupValue: invoice['status'],
+                onChanged: (value) async {
+                  await invoice.reference.update({'status': value});
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Status updated to $value'), backgroundColor: Colors.green),
+                    );
+                  }
+                },
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showInvoiceDialog(BuildContext context, QueryDocumentSnapshot? existingInvoice, Map<String, String> clientMap) {
+    showDialog(
+      context: context,
+      builder: (context) => _InvoiceDialog(existingInvoice: existingInvoice, clientMap: clientMap),
+    );
+  }
+
+  void _deleteInvoice(BuildContext context, QueryDocumentSnapshot invoice) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Invoice'),
+        content: const Text('Are you sure you want to delete this invoice?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await invoice.reference.delete();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invoice deleted'), backgroundColor: Colors.green),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// --- 4. CLIENTS SCREEN ---
-class ClientsScreen extends StatelessWidget {
-  const ClientsScreen({super.key});
+class _InvoiceDialog extends StatefulWidget {
+  final QueryDocumentSnapshot? existingInvoice;
+  final Map<String, String> clientMap;
+
+  const _InvoiceDialog({this.existingInvoice, required this.clientMap});
+
+  @override
+  State<_InvoiceDialog> createState() => _InvoiceDialogState();
+}
+
+class _InvoiceDialogState extends State<_InvoiceDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _descCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  String? _selectedClientId;
+  String _selectedStatus = 'Pending';
+  DateTime _selectedDate = DateTime.now();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingInvoice != null) {
+      _descCtrl.text = widget.existingInvoice!['description'];
+      _amountCtrl.text = widget.existingInvoice!['amount'].toString();
+      _selectedClientId = widget.existingInvoice!['clientId'];
+      _selectedStatus = widget.existingInvoice!['status'];
+      _selectedDate = DateFormat('yyyy-MM-dd').parse(widget.existingInvoice!['date']);
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate() || _selectedClientId == null) {
+      if (_selectedClientId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a client'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final data = {
+        'clientId': _selectedClientId,
+        'clientName': widget.clientMap[_selectedClientId],
+        'description': _descCtrl.text.trim(),
+        'amount': double.parse(_amountCtrl.text),
+        'status': _selectedStatus,
+        'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+
+      if (widget.existingInvoice != null) {
+        await widget.existingInvoice!.reference.update(data);
+      } else {
+        await FirebaseFirestore.instance
+            .collection('artifacts/notaryflow-v2/users/$uid/invoices')
+            .add(data);
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.existingInvoice != null ? 'Invoice updated!' : 'Invoice created!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(child: TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: "New Client Name"))),
-                  const SizedBox(width: 16),
-                  ElevatedButton(onPressed: () {
-                    if (nameCtrl.text.isEmpty) return;
-                    FirebaseFirestore.instance.collection('artifacts/notaryflow-v2/users/$uid/clients').add({
-                      'name': nameCtrl.text,
-                      'createdAt': FieldValue.serverTimestamp(),
-                    });
-                    nameCtrl.clear();
-                  }, child: const Text("Add")),
-                ],
-              ),
+    return AlertDialog(
+      title: Text(widget.existingInvoice != null ? 'Edit Invoice' : 'New Invoice'),
+      content: SizedBox(
+        width: 400,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedClientId,
+                  decoration: const InputDecoration(labelText: "Client", border: OutlineInputBorder()),
+                  items: widget.clientMap.entries
+                      .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _selectedClientId = value),
+                  validator: (v) => v == null ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descCtrl,
+                  decoration: const InputDecoration(labelText: "Description", border: OutlineInputBorder()),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _amountCtrl,
+                  decoration: const InputDecoration(labelText: "Amount", prefixText: "\$", border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Required';
+                    final amount = double.tryParse(v);
+                    if (amount == null || amount <= 0) return 'Enter valid amount';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedStatus,
+                  decoration: const InputDecoration(labelText: "Status", border: OutlineInputBorder()),
+                  items: ['Pending', 'Paid', 'Overdue']
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _selectedStatus = value!),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: const Text("Date"),
+                  subtitle: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (date != null) setState(() => _selectedDate = date);
+                  },
+                ),
+              ],
             ),
           ),
         ),
-        Expanded(
-          child: StreamBuilder(
-            stream: FirebaseFirestore.instance.collection('artifacts/notaryflow-v2/users/$uid/clients').snapshots(),
-            builder: (ctx, snap) {
-              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              return ListView(
-                children: snap.data!.docs.map((doc) => ListTile(
-                  leading: const Icon(Icons.business),
-                  title: Text(doc['name']),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => doc.reference.delete(),
-                  ),
-                )).toList(),
-              );
-            },
-          ),
-        )
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving
+              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save'),
+        ),
       ],
     );
   }
 }
 
-// --- 5. CALCULATOR SCREEN ---
+// --- CLIENTS SCREEN ---
+class ClientsScreen extends StatefulWidget {
+  const ClientsScreen({super.key});
+
+  @override
+  State<ClientsScreen> createState() => _ClientsScreenState();
+}
+
+class _ClientsScreenState extends State<ClientsScreen> {
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = '';
+
+  Future<void> _exportCSV(List<QueryDocumentSnapshot> clients) async {
+    List<List<dynamic>> rows = [
+      ['Name', 'Email', 'Phone'],
+      ...clients.map((doc) => [
+        doc['name'],
+        doc['email'] ?? '',
+        doc['phone'] ?? '',
+      ]),
+    ];
+
+    String csv = const ListToCsvConverter().convert(rows);
+    final bytes = html.Blob([csv], 'text/csv');
+    final url = html.Url.createObjectUrlFromBlob(bytes);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', 'clients_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('CSV exported!'), backgroundColor: Colors.green),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    return StreamBuilder(
+      stream: FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/clients')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        var clients = snapshot.data!.docs;
+
+        // Filter by search
+        if (_searchQuery.isNotEmpty) {
+          clients = clients.where((doc) {
+            final name = doc['name'] ?? '';
+            final email = doc['email'] ?? '';
+            final phone = doc['phone'] ?? '';
+            final query = _searchQuery.toLowerCase();
+            return name.toLowerCase().contains(query) ||
+                email.toLowerCase().contains(query) ||
+                phone.toLowerCase().contains(query);
+          }).toList();
+        }
+
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Search clients...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  setState(() => _searchQuery = '');
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (value) => setState(() => _searchQuery = value),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: clients.isEmpty ? null : () => _exportCSV(clients),
+                    icon: const Icon(Icons.file_download),
+                    tooltip: 'Export CSV',
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: () => _showClientDialog(context, null),
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Client"),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: clients.isEmpty
+                  ? _EmptyState(
+                      icon: Icons.people,
+                      title: _searchQuery.isEmpty ? "No clients yet" : "No matching clients",
+                      message: _searchQuery.isEmpty ? "Add your first client" : "Try a different search",
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: clients.length,
+                      itemBuilder: (context, i) {
+                        final doc = clients[i];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ListTile(
+                            leading: const CircleAvatar(child: Icon(Icons.person)),
+                            title: Text(doc['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text("${doc['email'] ?? 'No email'}\n${doc['phone'] ?? 'No phone'}"),
+                            isThreeLine: true,
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _deleteClient(context, doc),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showClientDialog(BuildContext context, QueryDocumentSnapshot? existing) {
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: existing?['name']);
+    final emailCtrl = TextEditingController(text: existing?['email']);
+    final phoneCtrl = TextEditingController(text: existing?['phone']);
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(existing != null ? 'Edit Client' : 'New Client'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: "Name", border: OutlineInputBorder()),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder()),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: "Phone", border: OutlineInputBorder()),
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setState(() => isSaving = true);
+
+                      try {
+                        final uid = FirebaseAuth.instance.currentUser!.uid;
+                        final data = {
+                          'name': nameCtrl.text.trim(),
+                          'email': emailCtrl.text.trim(),
+                          'phone': phoneCtrl.text.trim(),
+                        };
+
+                        if (existing != null) {
+                          await existing.reference.update(data);
+                        } else {
+                          await FirebaseFirestore.instance
+                              .collection('artifacts/notaryflow-v2/users/$uid/clients')
+                              .add(data);
+                        }
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(existing != null ? 'Client updated!' : 'Client added!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      } finally {
+                        setState(() => isSaving = false);
+                      }
+                    },
+              child: isSaving
+                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _deleteClient(BuildContext context, QueryDocumentSnapshot client) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Client'),
+        content: const Text('Are you sure? This will not delete associated invoices.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await client.reference.delete();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Client deleted'), backgroundColor: Colors.green),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- CALCULATOR SCREEN ---
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
 
@@ -594,34 +1951,69 @@ class CalculatorScreen extends StatefulWidget {
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
-  double _sigs = 1;
-  double _miles = 0;
+  final _signaturesCtrl = TextEditingController();
+  final _milesCtrl = TextEditingController();
+  double _estimate = 0;
+
+  void _calculate() {
+    final sigs = int.tryParse(_signaturesCtrl.text) ?? 0;
+    final miles = double.tryParse(_milesCtrl.text) ?? 0;
+    setState(() {
+      _estimate = (sigs * 15) + (miles * 0.67);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    double total = (_sigs * 15) + (_miles * 2);
-
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Center(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text("Fee Estimator", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 32),
-                  Text("Signatures: ${_sigs.toInt()} (\$${(_sigs*15).toInt()})"),
-                  Slider(value: _sigs, min: 1, max: 20, divisions: 19, label: _sigs.toString(), onChanged: (v) => setState(()=>_sigs=v)),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _signaturesCtrl,
+                    decoration: const InputDecoration(
+                      labelText: "Number of Signatures",
+                      border: OutlineInputBorder(),
+                      helperText: "\$15 per signature",
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => _calculate(),
+                  ),
                   const SizedBox(height: 16),
-                  Text("Miles: ${_miles.toInt()} (\$${(_miles*2).toInt()})"),
-                  Slider(value: _miles, min: 0, max: 100, divisions: 100, label: _miles.toString(), onChanged: (v) => setState(()=>_miles=v)),
-                  const Divider(height: 48),
-                  const Text("Total Estimate", style: TextStyle(color: Colors.grey)),
-                  Text("\$${total.toStringAsFixed(2)}", style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                  TextField(
+                    controller: _milesCtrl,
+                    decoration: const InputDecoration(
+                      labelText: "Miles Driven",
+                      border: OutlineInputBorder(),
+                      helperText: "\$0.67 per mile",
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => _calculate(),
+                  ),
+                  const SizedBox(height: 32),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Estimated Total:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text("\$${_estimate.toStringAsFixed(2)}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -632,7 +2024,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 }
 
-// --- 6. SETTINGS SCREEN ---
+// --- SETTINGS SCREEN ---
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -641,9 +2033,13 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _nameCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _businessNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  bool _isSaving = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -653,47 +2049,151 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadProfile() async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final doc = await FirebaseFirestore.instance.doc('artifacts/notaryflow-v2/users/$uid/profile/business_info').get();
+    final doc = await FirebaseFirestore.instance
+        .doc('artifacts/notaryflow-v2/users/$uid/profile/business_info')
+        .get();
+
     if (doc.exists) {
-      final data = doc.data()!;
-      _nameCtrl.text = data['businessName'] ?? '';
-      _emailCtrl.text = data['email'] ?? '';
-      _addressCtrl.text = data['address'] ?? '';
+      setState(() {
+        _businessNameCtrl.text = doc['businessName'] ?? '';
+        _emailCtrl.text = doc['email'] ?? '';
+        _phoneCtrl.text = doc['phone'] ?? '';
+        _addressCtrl.text = doc['address'] ?? '';
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _save() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    await FirebaseFirestore.instance.doc('artifacts/notaryflow-v2/users/$uid/profile/business_info').set({
-      'businessName': _nameCtrl.text,
-      'email': _emailCtrl.text,
-      'address': _addressCtrl.text,
-    }, SetOptions(merge: true));
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved")));
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      await FirebaseFirestore.instance
+          .doc('artifacts/notaryflow-v2/users/$uid/profile/business_info')
+          .set({
+        'businessName': _businessNameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'phone': _phoneCtrl.text.trim(),
+        'address': _addressCtrl.text.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Business Profile", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const Text("This info will appear on your PDF invoices."),
-              const SizedBox(height: 24),
-              TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: "Business Name", border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(controller: _emailCtrl, decoration: const InputDecoration(labelText: "Business Email", border: OutlineInputBorder())),
-              const SizedBox(height: 16),
-              TextField(controller: _addressCtrl, decoration: const InputDecoration(labelText: "Address", border: OutlineInputBorder()), maxLines: 3),
-              const SizedBox(height: 24),
-              SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: _save, icon: const Icon(Icons.save), label: const Text("Save Profile"))),
-            ],
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Business Profile", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _businessNameCtrl,
+                      decoration: const InputDecoration(labelText: "Business Name", border: OutlineInputBorder()),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder()),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (!v.contains('@')) return 'Invalid email';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _phoneCtrl,
+                      decoration: const InputDecoration(labelText: "Phone", border: OutlineInputBorder()),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _addressCtrl,
+                      decoration: const InputDecoration(labelText: "Address", border: OutlineInputBorder()),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _saveProfile,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text("Save Profile"),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- EMPTY STATE WIDGET ---
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _EmptyState({required this.icon, required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+            const SizedBox(height: 8),
+            Text(message, style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
+          ],
         ),
       ),
     );
