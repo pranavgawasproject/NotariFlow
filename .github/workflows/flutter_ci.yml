@@ -1,0 +1,104 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  version:
+    name: Create Version Number
+    runs-on: ubuntu-latest
+    outputs:
+      version_name: ${{ steps.version_step.outputs.version_name }}
+      build_number: ${{ steps.version_step.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate Version
+        id: version_step
+        run: |
+          # Simple versioning strategy: 1.0.<run_number>
+          # You can adapt this to read from pubspec.yaml or git tags
+          VERSION_NAME="1.0.${{ github.run_number }}"
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "Generated Version: $VERSION_NAME+$BUILD_NUMBER"
+
+  build_android:
+    name: Build Android APK
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate Android Platform
+        run: |
+          if [ ! -d "android" ]; then
+            echo "Generating Android platform folder..."
+            flutter create . --platforms=android
+          fi
+
+      - name: Build Android APK
+        run: |
+          flutter build apk --release \
+            --build-name=${{ needs.version.outputs.version_name }} \
+            --build-number=${{ needs.version.outputs.build_number }}
+        
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build_ios:
+    name: Build iOS App
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate iOS Platform
+        run: |
+          if [ ! -d "ios" ]; then
+            echo "Generating iOS platform folder..."
+            flutter create . --platforms=ios
+          fi
+
+      - name: Build iOS (No Codesign)
+        # Building unsigned release for testing/validation
+        run: |
+          flutter build ios --release --no-codesign \
+            --build-name=${{ needs.version.outputs.version_name }} \
+            --build-number=${{ needs.version.outputs.build_number }}
+            
+      - name: Compress iOS App
+        run: |
+          cd build/ios/iphoneos
+          tar -czf Runner.app.tar.gz Runner.app
+
+      - name: Upload iOS App
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ios-app
+          path: build/ios/iphoneos/Runner.app.tar.gz
