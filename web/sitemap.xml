@@ -6,75 +6,75 @@
 
   <!-- Homepage -->
   <url>
-    <loc>https://notariflow.com/</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <!-- Login Page -->
   <url>
-    <loc>https://notariflow.com/login</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/login</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Signup Page -->
   <url>
-    <loc>https://notariflow.com/signup</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/signup</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <!-- Dashboard (requires auth, but list for completeness) -->
   <url>
-    <loc>https://notariflow.com/dashboard</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/dashboard</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
 
   <!-- Features Pages -->
   <url>
-    <loc>https://notariflow.com/mileage</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/mileage</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://notariflow.com/invoices</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/invoices</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://notariflow.com/clients</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/clients</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://notariflow.com/calculator</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/calculator</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <url>
-    <loc>https://notariflow.com/analytics</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/analytics</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <url>
-    <loc>https://notariflow.com/settings</loc>
-    <lastmod>2025-06-16</lastmod>
+    <loc>https://notariflow.web.app/settings</loc>
+    <lastmod>2025-11-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>

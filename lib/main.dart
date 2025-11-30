@@ -9,9 +9,17 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:csv/csv.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'screens/journal_screen.dart';
+import 'utils/currency_service.dart';
 
 // --- CONFIGURATION ---
 const firebaseOptions = FirebaseOptions(
@@ -25,8 +33,11 @@ const firebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await CurrencyService().load();
   try {
     await Firebase.initializeApp(options: firebaseOptions);
+    // Enable offline persistence for rural areas
+    FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
   } catch (e) {
     await Firebase.initializeApp();
   }
@@ -439,37 +450,51 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
+  // Desktop: Full Navigation Rail
+  final List<Widget> _desktopScreens = [
     const DashboardScreen(),
     const AnalyticsScreen(),
     const InvoicesScreen(),
+    const ExpensesScreen(),
     const ClientsScreen(),
     const MileageScreen(),
     const CalculatorScreen(),
+    const JournalScreen(),
     const SettingsScreen(),
   ];
 
-  // Mobile optimized screens (same as desktop now - simplified)
+  // Mobile: Simplified Bottom Nav
   final List<Widget> _mobileScreens = [
     const DashboardScreen(),
-    const AnalyticsScreen(),
     const InvoicesScreen(),
-    const ClientsScreen(),
+    const JournalScreen(),
     const MileageScreen(),
-    const CalculatorScreen(),
-    const SettingsScreen(),
+    const MoreScreen(),
   ];
 
   String _getScreenTitle(int index, bool isMobile) {
-    switch (index) {
-      case 0: return 'Dashboard';
-      case 1: return 'Analytics';
-      case 2: return 'Invoices';
-      case 3: return 'Clients';
-      case 4: return 'Mileage';
-      case 5: return 'Calculator';
-      case 6: return 'Settings';
-      default: return 'NotaryFlow';
+    if (isMobile) {
+      switch (index) {
+        case 0: return 'Dashboard';
+        case 1: return 'Invoices';
+        case 2: return 'Journal';
+        case 3: return 'Mileage';
+        case 4: return 'Menu';
+        default: return 'NotaryFlow';
+      }
+    } else {
+      switch (index) {
+        case 0: return 'Dashboard';
+        case 1: return 'Analytics';
+        case 2: return 'Invoices';
+        case 3: return 'Expenses';
+        case 4: return 'Clients';
+        case 5: return 'Mileage';
+        case 6: return 'Calculator';
+        case 7: return 'Journal';
+        case 8: return 'Settings';
+        default: return 'NotaryFlow';
+      }
     }
   }
 
@@ -478,14 +503,20 @@ class _MainLayoutState extends State<MainLayout> {
     return LayoutBuilder(
       builder: (context, constraints) {
         bool isWide = constraints.maxWidth > 800;
-        final screens = isWide ? _screens : _mobileScreens;
+        
+        // Safety check for index when switching modes
+        int activeIndex = _selectedIndex;
+        if (isWide && activeIndex >= _desktopScreens.length) activeIndex = 0;
+        if (!isWide && activeIndex >= _mobileScreens.length) activeIndex = 0;
+
+        final currentScreen = isWide ? _desktopScreens[activeIndex] : _mobileScreens[activeIndex];
 
         return Scaffold(
           body: Row(
             children: [
               if (isWide)
                 NavigationRail(
-                  selectedIndex: _selectedIndex,
+                  selectedIndex: activeIndex,
                   onDestinationSelected: (int index) => setState(() => _selectedIndex = index),
                   backgroundColor: const Color(0xFF0F172A),
                   indicatorColor: Colors.indigo,
@@ -515,9 +546,11 @@ class _MainLayoutState extends State<MainLayout> {
                     NavigationRailDestination(icon: Icon(Icons.dashboard), label: Text('Dashboard')),
                     NavigationRailDestination(icon: Icon(Icons.analytics), label: Text('Analytics')),
                     NavigationRailDestination(icon: Icon(Icons.receipt_long), label: Text('Invoices')),
+                    NavigationRailDestination(icon: Icon(Icons.attach_money), label: Text('Expenses')),
                     NavigationRailDestination(icon: Icon(Icons.people), label: Text('Clients')),
                     NavigationRailDestination(icon: Icon(Icons.directions_car), label: Text('Mileage')),
                     NavigationRailDestination(icon: Icon(Icons.calculate), label: Text('Calculator')),
+                    NavigationRailDestination(icon: Icon(Icons.book), label: Text('Journal')),
                     NavigationRailDestination(icon: Icon(Icons.settings), label: Text('Settings')),
                   ],
                 ),
@@ -531,42 +564,70 @@ class _MainLayoutState extends State<MainLayout> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _getScreenTitle(_selectedIndex, !isWide),
+                            _getScreenTitle(activeIndex, !isWide),
                             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
-                          PopupMenuButton<String>(
-                            child: CircleAvatar(
-                              backgroundColor: Colors.indigo,
-                              child: Text(
-                                (FirebaseAuth.instance.currentUser?.displayName ?? 'U')[0].toUpperCase(),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            itemBuilder: (context) => <PopupMenuEntry<String>>[
-                              PopupMenuItem(
-                                child: Text(FirebaseAuth.instance.currentUser?.email ?? ''),
-                                enabled: false,
-                              ),
-                              const PopupMenuDivider(),
-                              PopupMenuItem(
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.logout, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('Logout'),
-                                  ],
+                          StreamBuilder<DocumentSnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .doc('artifacts/notaryflow-v2/users/${FirebaseAuth.instance.currentUser!.uid}/profile/business_info')
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              String initial = 'U';
+                              String? photoUrl;
+                              String email = FirebaseAuth.instance.currentUser?.email ?? '';
+
+                              if (snapshot.hasData && snapshot.data!.exists) {
+                                final data = snapshot.data!.data() as Map<String, dynamic>;
+                                final name = data['businessName'] as String?;
+                                if (name != null && name.isNotEmpty) {
+                                  initial = name[0].toUpperCase();
+                                }
+                                photoUrl = data['logoUrl'] as String?;
+                              } else {
+                                final authName = FirebaseAuth.instance.currentUser?.displayName;
+                                if (authName != null && authName.isNotEmpty) {
+                                  initial = authName[0].toUpperCase();
+                                }
+                              }
+
+                              return PopupMenuButton<String>(
+                                child: CircleAvatar(
+                                  backgroundColor: Colors.indigo,
+                                  backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+                                  child: photoUrl == null
+                                      ? Text(
+                                          initial,
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                        )
+                                      : null,
                                 ),
-                                onTap: () async {
-                                  await FirebaseAuth.instance.signOut();
-                                },
-                              ),
-                            ],
+                                itemBuilder: (context) => <PopupMenuEntry<String>>[
+                                  PopupMenuItem(
+                                    child: Text(email),
+                                    enabled: false,
+                                  ),
+                                  const PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.logout, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('Logout'),
+                                      ],
+                                    ),
+                                    onTap: () async {
+                                      await FirebaseAuth.instance.signOut();
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ],
                       ),
                     ),
                     const Divider(height: 1),
-                    Expanded(child: screens[_selectedIndex]),
+                    Expanded(child: currentScreen),
                   ],
                 ),
               ),
@@ -575,7 +636,7 @@ class _MainLayoutState extends State<MainLayout> {
           bottomNavigationBar: isWide
               ? null
               : BottomNavigationBar(
-                  currentIndex: _selectedIndex,
+                  currentIndex: activeIndex,
                   onTap: (index) => setState(() => _selectedIndex = index),
                   type: BottomNavigationBarType.fixed,
                   selectedItemColor: Colors.indigo,
@@ -584,12 +645,10 @@ class _MainLayoutState extends State<MainLayout> {
                   unselectedFontSize: 11,
                   items: const [
                     BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Home'),
-                    BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'Analytics'),
                     BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Invoices'),
-                    BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Clients'),
+                    BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Journal'),
                     BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Mileage'),
-                    BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'Calc'),
-                    BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+                    BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Menu'),
                   ],
                 ),
         );
@@ -616,44 +675,58 @@ class DashboardScreen extends StatelessWidget {
               .collection('artifacts/notaryflow-v2/users/$uid/trips')
               .snapshots(),
           builder: (context, tripSnapshot) {
-            if (!invSnapshot.hasData || !tripSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
+            return StreamBuilder(
+              stream: FirebaseFirestore.instance
+                  .collection('artifacts/notaryflow-v2/users/$uid/expenses')
+                  .snapshots(),
+              builder: (context, expSnapshot) {
+                if (!invSnapshot.hasData || !tripSnapshot.hasData || !expSnapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-            final invoices = invSnapshot.data!.docs;
-            final trips = tripSnapshot.data!.docs;
+                final invoices = invSnapshot.data!.docs;
+                final trips = tripSnapshot.data!.docs;
+                final expenses = expSnapshot.data!.docs;
 
-            double totalIncome = 0;
-            double pendingIncome = 0;
-            double paidIncome = 0;
+                double totalIncome = 0;
+                double pendingIncome = 0;
+                double paidIncome = 0;
 
-            for (var doc in invoices) {
-              final amount = (doc['amount'] as num).toDouble();
-              totalIncome += amount;
-              if (doc['status'] == 'Pending') pendingIncome += amount;
-              if (doc['status'] == 'Paid') paidIncome += amount;
-            }
+                for (var doc in invoices) {
+                  final amount = (doc['amount'] as num).toDouble();
+                  totalIncome += amount;
+                  if (doc['status'] == 'Pending') pendingIncome += amount;
+                  if (doc['status'] == 'Paid') paidIncome += amount;
+                }
 
-            double totalMiles = 0;
-            for (var doc in trips) {
-              totalMiles += (doc['miles'] as num).toDouble();
-            }
-            double taxDed = totalMiles * 0.67;
+                double totalExpenses = 0;
+                for (var doc in expenses) {
+                  totalExpenses += (doc['amount'] as num).toDouble();
+                }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
+                double totalMiles = 0;
+                for (var doc in trips) {
+                  totalMiles += (doc['miles'] as num).toDouble();
+                }
+                double taxDed = totalMiles * 0.67;
+                
+                double netProfit = paidIncome - totalExpenses;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
                     children: [
-                      _StatCard(title: "Total Revenue", value: "\$${totalIncome.toStringAsFixed(2)}", icon: Icons.attach_money, color: Colors.green),
-                      _StatCard(title: "Paid", value: "\$${paidIncome.toStringAsFixed(2)}", icon: Icons.check_circle, color: Colors.blue),
-                      _StatCard(title: "Pending", value: "\$${pendingIncome.toStringAsFixed(2)}", icon: Icons.access_time, color: Colors.orange),
-                      _StatCard(title: "Tax Deductions", value: "\$${taxDed.toStringAsFixed(2)}", icon: Icons.directions_car, color: Colors.purple),
-                    ],
-                  ),
+                      Wrap(
+                        spacing: 16,
+                        runSpacing: 16,
+                        children: [
+                          _StatCard(title: "Total Revenue", value: "${CurrencyService().currencySymbol}${totalIncome.toStringAsFixed(2)}", icon: Icons.attach_money, color: Colors.green),
+                          _StatCard(title: "Net Profit", value: "${CurrencyService().currencySymbol}${netProfit.toStringAsFixed(2)}", icon: Icons.account_balance_wallet, color: Colors.blue),
+                          _StatCard(title: "Expenses", value: "${CurrencyService().currencySymbol}${totalExpenses.toStringAsFixed(2)}", icon: Icons.money_off, color: Colors.red),
+                          _StatCard(title: "Pending", value: "${CurrencyService().currencySymbol}${pendingIncome.toStringAsFixed(2)}", icon: Icons.access_time, color: Colors.orange),
+                          _StatCard(title: "Tax Deductions", value: "${CurrencyService().currencySymbol}${taxDed.toStringAsFixed(2)}", icon: Icons.directions_car, color: Colors.purple),
+                        ],
+                      ),
                   const SizedBox(height: 24),
                   Card(
                     child: Padding(
@@ -681,7 +754,7 @@ class DashboardScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text("\$${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text("${CurrencyService().currencySymbol}${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                   _StatusBadge(status: doc['status']),
                                 ],
                               ),
@@ -695,6 +768,8 @@ class DashboardScreen extends StatelessWidget {
             );
           },
         );
+      },
+    );
       },
     );
   }
@@ -833,119 +908,203 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         final sortedMonths = monthlyRevenue.keys.toList()..sort();
         final revenueData = sortedMonths.map((month) => monthlyRevenue[month]!).toList();
 
+        // Fix for "weird" chart: Ensure at least 2 points for a line, or use BarChart
+        // If only 1 month, add a dummy previous month with 0 revenue
+        if (sortedMonths.length == 1) {
+           // This is a hack to make the line chart look okay with 1 point
+           // But BarChart is better for discrete monthly data. Let's switch to BarChart.
+        }
+
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Revenue Trend", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              // Summary Cards Row
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  _AnalyticsCard(
+                    title: "Total Revenue",
+                    value: "${CurrencyService().currencySymbol}${monthlyRevenue.values.fold(0.0, (sum, val) => sum + val).toStringAsFixed(0)}",
+                    icon: Icons.trending_up,
+                    color: Colors.green,
+                  ),
+                  _AnalyticsCard(
+                    title: "Paid Invoices",
+                    value: "${statusCounts['Paid']}",
+                    icon: Icons.check_circle,
+                    color: Colors.blue,
+                  ),
+                  _AnalyticsCard(
+                    title: "Pending",
+                    value: "${statusCounts['Pending']}",
+                    icon: Icons.schedule,
+                    color: Colors.orange,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Text("Monthly Revenue", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               Card(
+                elevation: 2,
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: SizedBox(
-                    height: 250,
-                    child: LineChart(
-                      LineChartData(
-                        gridData: FlGridData(show: true),
+                    height: 280,
+                    child: BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: (revenueData.isEmpty ? 100 : revenueData.reduce((a, b) => a > b ? a : b)) * 1.15,
+                        barTouchData: BarTouchData(
+                          enabled: true,
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipColor: (group) => Colors.indigo.shade700,
+                            tooltipPadding: const EdgeInsets.all(8),
+                            tooltipMargin: 8,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              final date = DateTime.parse("${sortedMonths[group.x.toInt()]}-01");
+                              return BarTooltipItem(
+                                '${DateFormat('MMM yyyy').format(date)}\n${CurrencyService().currencySymbol}${rod.toY.toStringAsFixed(0)}',
+                                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                              );
+                            },
+                          ),
+                        ),
                         titlesData: FlTitlesData(
+                          show: true,
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
                               getTitlesWidget: (value, meta) {
                                 if (value.toInt() >= 0 && value.toInt() < sortedMonths.length) {
-                                  return Text(
-                                    sortedMonths[value.toInt()].substring(5),
-                                    style: const TextStyle(fontSize: 10),
+                                  final date = DateTime.parse("${sortedMonths[value.toInt()]}-01");
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 10.0),
+                                    child: Text(
+                                      DateFormat('MMM\nyy').format(date),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, height: 1.2),
+                                      textAlign: TextAlign.center,
+                                    ),
                                   );
                                 }
                                 return const Text('');
                               },
-                              reservedSize: 30,
+                              reservedSize: 38,
                             ),
                           ),
                           leftTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
-                              reservedSize: 50,
+                              reservedSize: 45,
                               getTitlesWidget: (value, meta) {
-                                return Text('\$${value.toInt()}', style: const TextStyle(fontSize: 10));
+                                if (value == 0) return const Text('');
+                                return Text(
+                                  value >= 1000 ? '\$${(value/1000).toStringAsFixed(1)}k' : '\$${value.toInt()}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w500),
+                                );
                               },
                             ),
                           ),
                           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
-                        borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.shade300)),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: revenueData.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
-                            isCurved: true,
-                            color: Colors.indigo,
-                            barWidth: 3,
-                            dotData: const FlDotData(show: true),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              color: Colors.indigo.withOpacity(0.1),
-                            ),
-                          ),
-                        ],
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          horizontalInterval: (revenueData.isEmpty ? 100 : revenueData.reduce((a, b) => a > b ? a : b)) / 4,
+                          getDrawingHorizontalLine: (value) {
+                            return FlLine(
+                              color: Colors.grey.shade200,
+                              strokeWidth: 1,
+                            );
+                          },
+                        ),
+                        borderData: FlBorderData(show: false),
+                        barGroups: List.generate(sortedMonths.length, (index) {
+                          return BarChartGroupData(
+                            x: index,
+                            barRods: [
+                              BarChartRodData(
+                                toY: revenueData[index],
+                                gradient: LinearGradient(
+                                  colors: [Colors.indigo.shade400, Colors.indigo.shade700],
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                ),
+                                width: 24,
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                              ),
+                            ],
+                          );
+                        }),
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-              const Text("Invoice Status Distribution", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              const Text("Invoice Status", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: SizedBox(
-                    height: 250,
-                    child: PieChart(
-                      PieChartData(
-                        sections: [
-                          PieChartSectionData(
-                            value: statusCounts['Paid']!.toDouble(),
-                            title: '${statusCounts['Paid']}',
-                            color: Colors.green,
-                            radius: 100,
-                            titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          PieChartSectionData(
-                            value: statusCounts['Pending']!.toDouble(),
-                            title: '${statusCounts['Pending']}',
-                            color: Colors.orange,
-                            radius: 100,
-                            titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                          PieChartSectionData(
-                            value: statusCounts['Overdue']!.toDouble(),
-                            title: '${statusCounts['Overdue']}',
-                            color: Colors.red,
-                            radius: 100,
-                            titleStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
                 children: [
-                  _LegendItem(color: Colors.green, label: 'Paid'),
-                  _LegendItem(color: Colors.orange, label: 'Pending'),
-                  _LegendItem(color: Colors.red, label: 'Overdue'),
+                  _StatCard(title: "Paid", value: "${statusCounts['Paid']}", icon: Icons.check_circle, color: Colors.green),
+                  _StatCard(title: "Pending", value: "${statusCounts['Pending']}", icon: Icons.access_time, color: Colors.orange),
+                  _StatCard(title: "Overdue", value: "${statusCounts['Overdue']}", icon: Icons.warning, color: Colors.red),
                 ],
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _AnalyticsCard extends StatelessWidget {
+  final String title, value;
+  final IconData icon;
+  final Color color;
+  const _AnalyticsCard({required this.title, required this.value, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 160, maxWidth: 200),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3), width: 2),
+          boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 4),
+            Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -974,7 +1133,7 @@ class _LegendItem extends StatelessWidget {
   }
 }
 
-// --- MILEAGE SCREEN WITH GPS ---
+// --- MILEAGE SCREEN WITH GPS & GOOGLE MAPS ---
 class MileageScreen extends StatefulWidget {
   const MileageScreen({super.key});
 
@@ -993,24 +1152,36 @@ class _MileageScreenState extends State<MileageScreen> {
   DateTime? _startTime;
   Position? _startPosition;
   bool _isSaving = false;
+  String? _gpsError;
+  
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+  final List<LatLng> _routePoints = [];
+  StreamSubscription<Position>? _positionStream;
+
+  static const CameraPosition _kInitialPosition = CameraPosition(
+    target: LatLng(37.7749, -122.4194), // San Francisco Default
+    zoom: 14.4746,
+  );
+
+  // Disable GPS tracking on Web
+  bool get _isGpsAvailable => !kIsWeb;
+
+  @override
+  void dispose() {
+    _positionStream?.cancel();
+    _mapController?.dispose();
+    super.dispose();
+  }
 
   void _startTrip() async {
-    // For web, we'll use a simpler approach
+    setState(() => _gpsError = null);
+    
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location services are disabled. You can still enter miles manually.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        setState(() {
-          _isTracking = true;
-          _startTime = DateTime.now();
-        });
+        setState(() => _gpsError = 'Location services are disabled. Please enable them or use Manual Entry.');
         return;
       }
 
@@ -1018,30 +1189,63 @@ class _MileageScreenState extends State<MileageScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location permission denied. Enter miles manually.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          setState(() {
-            _isTracking = true;
-            _startTime = DateTime.now();
-          });
+          setState(() => _gpsError = 'Location permission denied. Please use Manual Entry.');
           return;
         }
       }
 
+      if (permission == LocationPermission.deniedForever) {
+        setState(() => _gpsError = 'Location permissions are permanently denied. Please use Manual Entry.');
+        return;
+      }
+
+      // Web specific check
+      if (kIsWeb && html.window.location.protocol != 'https:' && !html.window.location.hostname!.contains('localhost')) {
+         setState(() => _gpsError = 'GPS requires HTTPS on web. Please use Manual Entry.');
+         return;
+      }
+
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 10));
       
       setState(() {
         _isTracking = true;
         _startTime = DateTime.now();
         _startPosition = position;
+        _gpsError = null;
+        _routePoints.clear();
+        _routePoints.add(LatLng(position.latitude, position.longitude));
+        _markers.add(Marker(
+          markerId: const MarkerId('start'),
+          position: LatLng(position.latitude, position.longitude),
+          infoWindow: const InfoWindow(title: 'Start Point'),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        ));
+      });
+
+      // Move map to start
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(
+        LatLng(position.latitude, position.longitude), 16
+      ));
+
+      // Start listening to position updates
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      ).listen((Position pos) {
+        setState(() {
+          _routePoints.add(LatLng(pos.latitude, pos.longitude));
+          _polylines.add(Polyline(
+            polylineId: const PolylineId('route'),
+            points: _routePoints,
+            color: Colors.blue,
+            width: 5,
+          ));
+        });
+        _mapController?.animateCamera(CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)));
       });
 
       if (mounted) {
@@ -1051,27 +1255,19 @@ class _MileageScreenState extends State<MileageScreen> {
       }
     } catch (e) {
       setState(() {
-        _isTracking = true;
-        _startTime = DateTime.now();
+        _gpsError = 'GPS Error: $e. Please use Manual Entry.';
       });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('GPS unavailable. Please enter miles manually.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
     }
   }
 
   void _stopTrip() async {
+    _positionStream?.cancel();
+    
     if (_startPosition != null) {
       try {
         final endPosition = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
-        ).timeout(const Duration(seconds: 5));
+        ).timeout(const Duration(seconds: 10));
 
         // Calculate distance in miles
         final distanceInMeters = Geolocator.distanceBetween(
@@ -1084,20 +1280,22 @@ class _MileageScreenState extends State<MileageScreen> {
 
         _milesCtrl.text = distanceInMiles;
         
+        setState(() {
+          _markers.add(Marker(
+            markerId: const MarkerId('end'),
+            position: LatLng(endPosition.latitude, endPosition.longitude),
+            infoWindow: const InfoWindow(title: 'End Point'),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          ));
+        });
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Distance tracked: $distanceInMiles miles'), backgroundColor: Colors.green),
           );
         }
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not calculate distance. Please enter manually.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
+        setState(() => _gpsError = 'Could not calculate end position. Please enter miles manually.');
       }
     }
 
@@ -1129,6 +1327,10 @@ class _MileageScreenState extends State<MileageScreen> {
       _milesCtrl.clear();
       _purposeCtrl.clear();
       _startPosition = null;
+      _gpsError = null;
+      _markers.clear();
+      _polylines.clear();
+      _routePoints.clear();
 
       setState(() => _showForm = false);
 
@@ -1168,41 +1370,182 @@ class _MileageScreenState extends State<MileageScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              // --- GPS / MANUAL TOGGLE CARD ---
               Card(
-                color: _isTracking ? Colors.green.shade50 : Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    children: [
-                      Icon(_isTracking ? Icons.location_on : Icons.location_off, size: 64, color: _isTracking ? Colors.green : Colors.grey),
-                      const SizedBox(height: 16),
-                      Text(
-                        _isTracking ? "GPS Tracking Active" : "Not Tracking",
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _isTracking ? Colors.green : Colors.grey),
+                color: Colors.white,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    // Map View
+                    SizedBox(
+                      height: 250,
+                      width: double.infinity,
+                      child: Stack(
+                        children: [
+                          if (_isGpsAvailable)
+                            GoogleMap(
+                              mapType: MapType.normal,
+                              initialCameraPosition: _kInitialPosition,
+                              onMapCreated: (GoogleMapController controller) {
+                                _mapController = controller;
+                                // Try to get current location to center map initially
+                                Geolocator.getCurrentPosition().then((pos) {
+                                  controller.animateCamera(CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)));
+                                }).catchError((e) {});
+                              },
+                              markers: _markers,
+                              polylines: _polylines,
+                              myLocationEnabled: true,
+                              myLocationButtonEnabled: true,
+                            )
+                          else
+                            Container(
+                              color: Colors.grey.shade100,
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.map, size: 64, color: Colors.grey.shade400),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'GPS Tracking Not Available on Web',
+                                      style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Please use Manual Entry or download the mobile app',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          if (_gpsError != null)
+                            Container(
+                              color: Colors.white.withOpacity(0.9),
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Text(_gpsError!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                      if (_isTracking && _startPosition != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          "Started: ${DateFormat('h:mm a').format(_startTime!)}",
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _isTracking ? _stopTrip : _startTrip,
-                        icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
-                        label: Text(_isTracking ? "Stop Trip" : "Start GPS Trip"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isTracking ? Colors.red : Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                        ),
+                    ),
+                    
+                    Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        children: [
+                          if (!_showForm) ...[
+                            const Text("Choose Tracking Method", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                // GPS Button
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: _isGpsAvailable ? (_isTracking ? _stopTrip : _startTrip) : null,
+                                        style: ElevatedButton.styleFrom(
+                                          shape: const CircleBorder(),
+                                          padding: const EdgeInsets.all(28),
+                                          backgroundColor: _isTracking ? Colors.red : Colors.green,
+                                          foregroundColor: Colors.white,
+                                          elevation: 4,
+                                        ),
+                                        child: Icon(_isTracking ? Icons.stop : Icons.gps_fixed, size: 36),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        _isTracking ? "Stop GPS" : "GPS Tracking",
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _isGpsAvailable
+                                            ? (_isTracking ? "Tap to finish" : "Auto-calculate miles")
+                                            : "Mobile Only",
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                // Manual Button
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: _isTracking ? null : () {
+                                          setState(() {
+                                            _showForm = true;
+                                            _startPosition = null;
+                                          });
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          shape: const CircleBorder(),
+                                          padding: const EdgeInsets.all(28),
+                                          backgroundColor: Colors.blue, // Changed to Blue to pop
+                                          foregroundColor: Colors.white,
+                                          elevation: 4,
+                                        ),
+                                        child: const Icon(Icons.edit, size: 36), // Changed to Pencil icon
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Text(
+                                        "Manual Entry",
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "Enter miles & tax",
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_isTracking) ...[
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green.shade200),
+                                ),
+                                child: Column(
+                                  children: [
+                                    const Icon(Icons.navigation, color: Colors.green, size: 32),
+                                    const SizedBox(height: 8),
+                                    const Text("Tracking in Progress...", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    Text("Started: ${DateFormat('h:mm a').format(_startTime!)}", style: const TextStyle(color: Colors.grey)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+              
               const SizedBox(height: 24),
+              
+              // --- ENTRY FORM ---
               if (_showForm) ...[
                 Card(
                   child: Padding(
@@ -1214,7 +1557,7 @@ class _MileageScreenState extends State<MileageScreen> {
                         children: [
                           Row(
                             children: [
-                              const Text("Log Trip", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const Text("Log Trip Details", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                               const Spacer(),
                               if (_startPosition != null)
                                 Container(
@@ -1230,6 +1573,21 @@ class _MileageScreenState extends State<MileageScreen> {
                                       Text('GPS Tracked', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
                                     ],
                                   ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 14, color: Colors.indigo),
+                                      SizedBox(width: 4),
+                                      Text('Manual Entry', style: TextStyle(fontSize: 11, color: Colors.indigo, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
                                 ),
                             ],
                           ),
@@ -1243,17 +1601,18 @@ class _MileageScreenState extends State<MileageScreen> {
                           TextFormField(
                             controller: _milesCtrl,
                             decoration: InputDecoration(
-                              labelText: "Miles",
+                              labelText: "Distance (Miles/KM)",
                               border: const OutlineInputBorder(),
                               suffixIcon: _startPosition != null 
                                 ? const Icon(Icons.gps_fixed, color: Colors.green)
                                 : null,
+                              helperText: "Enter total distance for round trip if applicable",
                             ),
                             keyboardType: TextInputType.number,
                             validator: (v) {
                               if (v == null || v.isEmpty) return 'Required';
                               final miles = double.tryParse(v);
-                              if (miles == null || miles <= 0) return 'Enter valid miles';
+                              if (miles == null || miles <= 0) return 'Enter valid distance';
                               return null;
                             },
                           ),
@@ -1300,15 +1659,15 @@ class _MileageScreenState extends State<MileageScreen> {
                         _EmptyState(
                           icon: Icons.directions_car,
                           title: "No trips yet",
-                          message: "Start tracking your mileage with GPS",
+                          message: "Start tracking your mileage",
                         )
                       else
                         ...trips.map((doc) => ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: doc['gpsTracked'] == true ? Colors.green.shade100 : Colors.grey.shade100,
+                            backgroundColor: doc['gpsTracked'] == true ? Colors.green.shade100 : Colors.indigo.shade100,
                             child: Icon(
-                              doc['gpsTracked'] == true ? Icons.gps_fixed : Icons.location_on,
-                              color: doc['gpsTracked'] == true ? Colors.green : Colors.grey,
+                              doc['gpsTracked'] == true ? Icons.gps_fixed : Icons.edit,
+                              color: doc['gpsTracked'] == true ? Colors.green : Colors.indigo,
                             ),
                           ),
                           title: Text(doc['location'], style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -1473,7 +1832,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
-                                        Text("\$${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        Text("${CurrencyService().currencySymbol}${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                         _StatusBadge(status: doc['status']),
                                       ],
                                     ),
@@ -1581,7 +1940,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('TOTAL:', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
-                  pw.Text('\$${invoice['amount']}', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.Text('${CurrencyService().currencySymbol}${invoice['amount']}', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
                 ],
               ),
             ],
@@ -1784,7 +2143,7 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _amountCtrl,
-                  decoration: const InputDecoration(labelText: "Amount", prefixText: "\$", border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: "Amount", prefixText: CurrencyService().currencySymbol, border: const OutlineInputBorder()),
                   keyboardType: TextInputType.number,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Required';
@@ -1834,6 +2193,172 @@ class _InvoiceDialogState extends State<_InvoiceDialog> {
               : const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+// --- EXPENSES SCREEN ---
+class ExpensesScreen extends StatefulWidget {
+  const ExpensesScreen({super.key});
+
+  @override
+  State<ExpensesScreen> createState() => _ExpensesScreenState();
+}
+
+class _ExpensesScreenState extends State<ExpensesScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _descCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _categoryCtrl = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+  bool _isSaving = false;
+
+  Future<void> _addExpense() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      await FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/$uid/expenses')
+          .add({
+        'description': _descCtrl.text.trim(),
+        'amount': double.parse(_amountCtrl.text),
+        'category': _categoryCtrl.text.trim(),
+        'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      _descCtrl.clear();
+      _amountCtrl.clear();
+      _categoryCtrl.clear();
+      setState(() => _selectedDate = DateTime.now());
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Expense added!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  void _showAddDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Expense'),
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _descCtrl,
+                decoration: const InputDecoration(labelText: 'Description (e.g. Toner)', border: OutlineInputBorder()),
+                validator: (v) => v!.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _amountCtrl,
+                decoration: InputDecoration(labelText: 'Amount', prefixText: CurrencyService().currencySymbol, border: const OutlineInputBorder()),
+                keyboardType: TextInputType.number,
+                validator: (v) => v!.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _categoryCtrl,
+                decoration: const InputDecoration(labelText: 'Category (e.g. Supplies)', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                title: const Text("Date"),
+                subtitle: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (date != null) setState(() => _selectedDate = date);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: _addExpense, child: const Text('Add')),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        child: const Icon(Icons.add),
+      ),
+      body: StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection('artifacts/notaryflow-v2/users/$uid/expenses')
+            .orderBy('date', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return _EmptyState(
+              icon: Icons.money_off,
+              title: "No expenses",
+              message: "Track your business spending here",
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              return Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.red.shade50,
+                    child: const Icon(Icons.attach_money, color: Colors.red),
+                  ),
+                  title: Text(doc['description']),
+                  subtitle: Text('${doc['category']} • ${doc['date']}'),
+                  trailing: Text(
+                    '-${CurrencyService().currencySymbol}${doc['amount']}',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  onLongPress: () async {
+                    // Simple delete on long press
+                    await doc.reference.delete();
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -2118,15 +2643,79 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   
   // Rates configuration
   String _selectedCountry = 'USA';
+  String? _selectedState;
   double _signatureRate = 15.0;
   double _mileageRate = 0.67;
 
+  // Simplified Country List (USA Only + Other)
   final Map<String, Map<String, double>> _countryRates = {
     'USA': {'signature': 15.0, 'mileage': 0.67},
-    'Canada': {'signature': 20.0, 'mileage': 0.68},
-    'UK': {'signature': 12.0, 'mileage': 0.45},
-    'Australia': {'signature': 18.0, 'mileage': 0.78},
-    'Custom': {'signature': 0.0, 'mileage': 0.0},
+    'Other': {'signature': 10.0, 'mileage': 0.50},
+  };
+
+  // Expanded US State/City List
+  final Map<String, double> _usStateRates = {
+    'Standard (Most States)': 5.0,
+    'Alabama': 5.0,
+    'Alaska': 5.0,
+    'Arizona': 10.0,
+    'Arkansas': 5.0,
+    'California': 15.0,
+    'Colorado': 5.0,
+    'Connecticut': 5.0,
+    'Delaware': 5.0,
+    'Florida': 10.0,
+    'Georgia': 2.0,
+    'Hawaii': 5.0,
+    'Idaho': 5.0,
+    'Illinois': 1.0,
+    'Indiana': 10.0,
+    'Iowa': 5.0,
+    'Kansas': 5.0,
+    'Kentucky': 0.50,
+    'Louisiana': 5.0,
+    'Maine': 5.0,
+    'Maryland': 4.0,
+    'Massachusetts': 1.25,
+    'Michigan': 10.0,
+    'Minnesota': 5.0,
+    'Mississippi': 5.0,
+    'Missouri': 5.0,
+    'Montana': 10.0,
+    'Nebraska': 5.0,
+    'Nevada': 15.0,
+    'New Hampshire': 10.0,
+    'New Jersey': 2.50,
+    'New Mexico': 5.0,
+    'New York': 2.0,
+    'North Carolina': 10.0,
+    'North Dakota': 5.0,
+    'Ohio': 5.0,
+    'Oklahoma': 5.0,
+    'Oregon': 10.0,
+    'Pennsylvania': 5.0,
+    'Rhode Island': 5.0,
+    'South Carolina': 5.0,
+    'South Dakota': 10.0,
+    'Tennessee': 0.0,
+    'Texas': 6.0,
+    'Utah': 10.0,
+    'Vermont': 5.0,
+    'Virginia': 5.0,
+    'Washington': 10.0,
+    'West Virginia': 10.0,
+    'Wisconsin': 5.0,
+    'Wyoming': 10.0,
+    'Los Angeles (City)': 15.0,
+    'New York (City)': 2.0,
+    'Chicago (City)': 1.0,
+    'Houston (City)': 6.0,
+    'Phoenix (City)': 10.0,
+    'Philadelphia (City)': 5.0,
+    'San Antonio (City)': 6.0,
+    'San Diego (City)': 15.0,
+    'Dallas (City)': 6.0,
+    'San Jose (City)': 15.0,
   };
 
   @override
@@ -2139,6 +2728,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _selectedCountry = prefs.getString('selected_country') ?? 'USA';
+      _selectedState = prefs.getString('selected_state');
       _signatureRate = prefs.getDouble('signature_rate') ?? 15.0;
       _mileageRate = prefs.getDouble('mileage_rate') ?? 0.67;
     });
@@ -2147,6 +2737,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   Future<void> _saveRates() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selected_country', _selectedCountry);
+    if (_selectedState != null) await prefs.setString('selected_state', _selectedState!);
     await prefs.setDouble('signature_rate', _signatureRate);
     await prefs.setDouble('mileage_rate', _mileageRate);
     
@@ -2173,60 +2764,87 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           title: const Text('Configure Rates'),
           content: SizedBox(
             width: 300,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: _selectedCountry,
-                  decoration: const InputDecoration(
-                    labelText: "Region/Country",
-                    border: OutlineInputBorder(),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _selectedCountry,
+                    decoration: const InputDecoration(
+                      labelText: "Region/Country",
+                      border: OutlineInputBorder(),
+                    ),
+                    items: _countryRates.keys.map((country) {
+                      return DropdownMenuItem(value: country, child: Text(country));
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _selectedCountry = value!;
+                        if (value != 'USA') {
+                          _signatureRate = _countryRates[value]!['signature']!;
+                          _mileageRate = _countryRates[value]!['mileage']!;
+                          _selectedState = null;
+                        } else if (value == 'USA') {
+                           _mileageRate = _countryRates['USA']!['mileage']!;
+                        }
+                      });
+                    },
                   ),
-                  items: _countryRates.keys.map((country) {
-                    return DropdownMenuItem(value: country, child: Text(country));
-                  }).toList(),
-                  onChanged: (value) {
-                    setDialogState(() {
-                      _selectedCountry = value!;
-                      if (value != 'Custom') {
-                        _signatureRate = _countryRates[value]!['signature']!;
-                        _mileageRate = _countryRates[value]!['mileage']!;
-                      }
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  initialValue: _signatureRate.toStringAsFixed(2),
-                  decoration: const InputDecoration(
-                    labelText: "Rate per Signature (\$)",
-                    border: OutlineInputBorder(),
+                  if (_selectedCountry == 'USA') ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedState,
+                      decoration: const InputDecoration(
+                        labelText: "State / City",
+                        border: OutlineInputBorder(),
+                        helperText: "Sets max fee per signature",
+                      ),
+                      items: _usStateRates.keys.map((state) {
+                        return DropdownMenuItem(value: state, child: Text(state));
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          _selectedState = value;
+                          if (value != null) {
+                            _signatureRate = _usStateRates[value]!;
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    key: ValueKey("sig_$_signatureRate"), // Force rebuild on change
+                    initialValue: _signatureRate.toStringAsFixed(2),
+                    decoration: const InputDecoration(
+                      labelText: "Rate per Signature (\$)",
+                      border: OutlineInputBorder(),
+                      helperText: "You can override this rate",
+                    ),
+                    keyboardType: TextInputType.number,
+                    enabled: true,
+                    onChanged: (value) {
+                      // Update local variable without rebuilding dialog to avoid cursor jump
+                      _signatureRate = double.tryParse(value) ?? 0.0;
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  enabled: _selectedCountry == 'Custom',
-                  onChanged: (value) {
-                    setDialogState(() {
-                      _signatureRate = double.tryParse(value) ?? 15.0;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  initialValue: _mileageRate.toStringAsFixed(2),
-                  decoration: const InputDecoration(
-                    labelText: "Rate per Mile/KM (\$)",
-                    border: OutlineInputBorder(),
-                    helperText: "IRS standard rate (2025): \$0.67/mile",
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    key: ValueKey("mil_$_mileageRate"),
+                    initialValue: _mileageRate.toStringAsFixed(2),
+                    decoration: const InputDecoration(
+                      labelText: "Rate per Mile (\$)",
+                      border: OutlineInputBorder(),
+                      helperText: "You can override this rate",
+                    ),
+                    keyboardType: TextInputType.number,
+                    enabled: true,
+                    onChanged: (value) {
+                      _mileageRate = double.tryParse(value) ?? 0.0;
+                    },
                   ),
-                  keyboardType: TextInputType.number,
-                  enabled: _selectedCountry == 'Custom',
-                  onChanged: (value) {
-                    setDialogState(() {
-                      _mileageRate = double.tryParse(value) ?? 0.67;
-                    });
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           actions: [
@@ -2288,7 +2906,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            "Region: $_selectedCountry | \$${_signatureRate.toStringAsFixed(2)}/signature • \$${_mileageRate.toStringAsFixed(2)}/mile",
+                            "Region: $_selectedCountry ${_selectedState != null ? '($_selectedState)' : ''} | \$${_signatureRate.toStringAsFixed(2)}/sig • \$${_mileageRate.toStringAsFixed(2)}/mi",
                             style: const TextStyle(fontSize: 12, color: Colors.indigo),
                           ),
                         ),
@@ -2370,8 +2988,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _commissionNumberCtrl = TextEditingController();
+  final _commissionExpCtrl = TextEditingController();
+  String? _logoUrl;
   bool _isSaving = false;
   bool _isLoading = true;
+  bool _isUploading = false;
+  String _selectedPlan = 'yearly'; // Default to yearly
 
   @override
   void initState() {
@@ -2393,6 +3016,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _emailCtrl.text = doc['email'] ?? '';
             _phoneCtrl.text = doc['phone'] ?? '';
             _addressCtrl.text = doc['address'] ?? '';
+            _commissionNumberCtrl.text = doc['commissionNumber'] ?? '';
+            _commissionExpCtrl.text = doc['commissionExp'] ?? '';
+            _logoUrl = doc['logoUrl'];
             _isLoading = false;
           });
         } else {
@@ -2402,6 +3028,76 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _launchPaymentUrl(String urlString) async {
+    try {
+      if (kIsWeb) {
+        html.window.open(urlString, '_blank');
+      } else {
+        final Uri url = Uri.parse(urlString);
+        if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Could not launch payment page.')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    
+    if (image == null) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('users/$uid/logo.jpg');
+      
+      if (kIsWeb) {
+        await ref.putData(await image.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+      } else {
+        await ref.putFile(File(image.path));
+      }
+
+      final url = await ref.getDownloadURL();
+      
+      setState(() {
+        _logoUrl = url;
+        _isUploading = false;
+      });
+
+      // Auto-save the new logo URL to profile
+      await FirebaseFirestore.instance
+          .doc('artifacts/notaryflow-v2/users/$uid/profile/business_info')
+          .set({'logoUrl': url}, SetOptions(merge: true));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Logo updated!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e. Ensure Firebase Storage is enabled.'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -2420,8 +3116,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'email': _emailCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
+        'commissionNumber': _commissionNumberCtrl.text.trim(),
+        'commissionExp': _commissionExpCtrl.text.trim(),
+        'logoUrl': _logoUrl,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2460,10 +3159,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     const Text("Business Profile", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
+                    
+                    // --- LOGO UPLOAD ---
+                    Center(
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: Colors.indigo.shade50,
+                            backgroundImage: _logoUrl != null ? NetworkImage(_logoUrl!) : null,
+                            child: _logoUrl == null
+                                ? Text(
+                                    _businessNameCtrl.text.isNotEmpty ? _businessNameCtrl.text[0].toUpperCase() : 'B',
+                                    style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.indigo),
+                                  )
+                                : null,
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: InkWell(
+                              onTap: _isUploading ? null : _pickAndUploadImage,
+                              child: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: Colors.white,
+                                child: _isUploading
+                                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.camera_alt, size: 20, color: Colors.indigo),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
                     TextFormField(
                       controller: _businessNameCtrl,
                       decoration: const InputDecoration(labelText: "Business Name", border: OutlineInputBorder()),
                       validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                      onChanged: (val) => setState(() {}), // Update avatar preview
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -2487,6 +3222,126 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       controller: _addressCtrl,
                       decoration: const InputDecoration(labelText: "Address", border: OutlineInputBorder()),
                       maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _commissionNumberCtrl,
+                            decoration: const InputDecoration(labelText: "Commission Number", border: OutlineInputBorder()),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _commissionExpCtrl,
+                            decoration: const InputDecoration(labelText: "Expiration Date", border: OutlineInputBorder(), hintText: "MM/DD/YYYY"),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // --- PREMIUM SUBSCRIPTION SECTION ---
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.amber.shade200),
+                        boxShadow: [
+                          BoxShadow(color: Colors.amber.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.star, color: Colors.amber, size: 28),
+                              SizedBox(width: 12),
+                              Text("Go Premium", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text("Unlock unlimited invoices, cloud sync, and advanced analytics.", style: TextStyle(fontSize: 14, color: Colors.black54)),
+                          const SizedBox(height: 20),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => setState(() => _selectedPlan = 'monthly'),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedPlan == 'monthly' ? Colors.amber.shade100 : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: _selectedPlan == 'monthly' ? Colors.amber : Colors.amber.shade200,
+                                        width: _selectedPlan == 'monthly' ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text("Monthly", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _selectedPlan == 'monthly' ? Colors.brown : Colors.grey)),
+                                        const SizedBox(height: 4),
+                                        const Text("\$14.99", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                                        if (_selectedPlan == 'monthly')
+                                          const Icon(Icons.check_circle, color: Colors.amber, size: 16),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => setState(() => _selectedPlan = 'yearly'),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedPlan == 'yearly' ? Colors.amber.shade100 : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: _selectedPlan == 'yearly' ? Colors.amber : Colors.amber.shade200,
+                                        width: _selectedPlan == 'yearly' ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Text("Yearly (Save 17%)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _selectedPlan == 'yearly' ? Colors.brown : Colors.grey)),
+                                        const SizedBox(height: 4),
+                                        const Text("\$149.00", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+                                        if (_selectedPlan == 'yearly')
+                                          const Icon(Icons.check_circle, color: Colors.amber, size: 16),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                final url = _selectedPlan == 'monthly'
+                                    ? 'https://notariflow.lemonsqueezy.com/buy/101bec89-b835-4862-a493-526855bde384'
+                                    : 'https://notariflow.lemonsqueezy.com/buy/74996c57-0a9e-4890-b424-86bd3aac606d';
+                                _launchPaymentUrl(url);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text("Subscribe ${_selectedPlan == 'monthly' ? 'Monthly' : 'Yearly'}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -2533,6 +3388,91 @@ class _EmptyState extends StatelessWidget {
             Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
             const SizedBox(height: 8),
             Text(message, style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- MORE SCREEN (Mobile Menu) ---
+class MoreScreen extends StatelessWidget {
+  const MoreScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GridView.count(
+        crossAxisCount: 2,
+        padding: const EdgeInsets.all(16),
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        children: [
+          _MenuCard(
+            icon: Icons.analytics, 
+            title: 'Analytics', 
+            color: Colors.purple,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Analytics')), body: const AnalyticsScreen()))),
+          ),
+          _MenuCard(
+            icon: Icons.attach_money, 
+            title: 'Expenses', 
+            color: Colors.red,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Expenses')), body: const ExpensesScreen()))),
+          ),
+          _MenuCard(
+            icon: Icons.people, 
+            title: 'Clients', 
+            color: Colors.orange,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Clients')), body: const ClientsScreen()))),
+          ),
+          _MenuCard(
+            icon: Icons.calculate, 
+            title: 'Calculator', 
+            color: Colors.teal,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Fee Calculator')), body: const CalculatorScreen()))),
+          ),
+          _MenuCard(
+            icon: Icons.settings, 
+            title: 'Settings', 
+            color: Colors.grey,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Settings')), body: const SettingsScreen()))),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MenuCard({required this.icon, required this.title, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 32, color: color),
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ],
         ),
       ),
