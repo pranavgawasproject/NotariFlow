@@ -10,8 +10,8 @@ import 'package:printing/printing.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:csv/csv.dart';
 import 'package:universal_html/html.dart' as html;
-import 'screens/calendar_screen.dart';
-import 'screens/journal_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // --- CONFIGURATION ---
 const firebaseOptions = FirebaseOptions(
@@ -142,7 +142,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.work, size: 64, color: Colors.indigo),
+                      Image.asset(
+                        'assets/images/logo.png',
+                        width: 100,
+                        height: 100,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.work, size: 64, color: Colors.indigo);
+                        },
+                      ),
                       const SizedBox(height: 16),
                       const Text(
                         'NotaryFlow',
@@ -435,26 +442,33 @@ class _MainLayoutState extends State<MainLayout> {
   final List<Widget> _screens = [
     const DashboardScreen(),
     const AnalyticsScreen(),
-    const CalendarScreen(),
-    const JournalScreen(),
-    const MileageScreen(),
     const InvoicesScreen(),
     const ClientsScreen(),
+    const MileageScreen(),
     const CalculatorScreen(),
     const SettingsScreen(),
   ];
 
-  String _getScreenTitle(int index) {
+  // Mobile optimized screens (same as desktop now - simplified)
+  final List<Widget> _mobileScreens = [
+    const DashboardScreen(),
+    const AnalyticsScreen(),
+    const InvoicesScreen(),
+    const ClientsScreen(),
+    const MileageScreen(),
+    const CalculatorScreen(),
+    const SettingsScreen(),
+  ];
+
+  String _getScreenTitle(int index, bool isMobile) {
     switch (index) {
       case 0: return 'Dashboard';
       case 1: return 'Analytics';
-      case 2: return 'Schedule';
-      case 3: return 'Journal';
-      case 4: return 'Mileage Tracker';
-      case 5: return 'Invoices';
-      case 6: return 'Clients';
-      case 7: return 'Fee Estimator';
-      case 8: return 'Settings';
+      case 2: return 'Invoices';
+      case 3: return 'Clients';
+      case 4: return 'Mileage';
+      case 5: return 'Calculator';
+      case 6: return 'Settings';
       default: return 'NotaryFlow';
     }
   }
@@ -464,6 +478,7 @@ class _MainLayoutState extends State<MainLayout> {
     return LayoutBuilder(
       builder: (context, constraints) {
         bool isWide = constraints.maxWidth > 800;
+        final screens = isWide ? _screens : _mobileScreens;
 
         return Scaffold(
           body: Row(
@@ -479,25 +494,30 @@ class _MainLayoutState extends State<MainLayout> {
                   selectedLabelTextStyle: const TextStyle(color: Colors.white),
                   unselectedLabelTextStyle: const TextStyle(color: Colors.grey),
                   extended: true,
-                  leading: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24.0),
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
                     child: Row(
                       children: [
-                        Icon(Icons.work, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text("NotaryFlow", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                        Image.asset(
+                          'assets/images/logo.png',
+                          width: 32,
+                          height: 32,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.work, color: Colors.white);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        const Text("NotaryFlow", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
                       ],
                     ),
                   ),
                   destinations: const [
                     NavigationRailDestination(icon: Icon(Icons.dashboard), label: Text('Dashboard')),
                     NavigationRailDestination(icon: Icon(Icons.analytics), label: Text('Analytics')),
-                    NavigationRailDestination(icon: Icon(Icons.calendar_month), label: Text('Schedule')),
-                    NavigationRailDestination(icon: Icon(Icons.book), label: Text('Journal')),
-                    NavigationRailDestination(icon: Icon(Icons.directions_car), label: Text('Mileage')),
-                    NavigationRailDestination(icon: Icon(Icons.attach_money), label: Text('Invoices')),
+                    NavigationRailDestination(icon: Icon(Icons.receipt_long), label: Text('Invoices')),
                     NavigationRailDestination(icon: Icon(Icons.people), label: Text('Clients')),
-                    NavigationRailDestination(icon: Icon(Icons.calculate), label: Text('Estimator')),
+                    NavigationRailDestination(icon: Icon(Icons.directions_car), label: Text('Mileage')),
+                    NavigationRailDestination(icon: Icon(Icons.calculate), label: Text('Calculator')),
                     NavigationRailDestination(icon: Icon(Icons.settings), label: Text('Settings')),
                   ],
                 ),
@@ -511,7 +531,7 @@ class _MainLayoutState extends State<MainLayout> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _getScreenTitle(_selectedIndex),
+                            _getScreenTitle(_selectedIndex, !isWide),
                             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
                           PopupMenuButton<String>(
@@ -546,7 +566,7 @@ class _MainLayoutState extends State<MainLayout> {
                       ),
                     ),
                     const Divider(height: 1),
-                    Expanded(child: _screens[_selectedIndex]),
+                    Expanded(child: screens[_selectedIndex]),
                   ],
                 ),
               ),
@@ -560,15 +580,15 @@ class _MainLayoutState extends State<MainLayout> {
                   type: BottomNavigationBarType.fixed,
                   selectedItemColor: Colors.indigo,
                   unselectedItemColor: Colors.grey,
+                  selectedFontSize: 12,
+                  unselectedFontSize: 11,
                   items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+                    BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Home'),
                     BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'Analytics'),
-                    BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Schedule'),
-                    BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Journal'),
-                    BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Mileage'),
-                    BottomNavigationBarItem(icon: Icon(Icons.attach_money), label: 'Invoices'),
+                    BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Invoices'),
                     BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Clients'),
-                    BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'Estimator'),
+                    BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Mileage'),
+                    BottomNavigationBarItem(icon: Icon(Icons.calculate), label: 'Calc'),
                     BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
                   ],
                 ),
@@ -954,7 +974,7 @@ class _LegendItem extends StatelessWidget {
   }
 }
 
-// --- MILEAGE SCREEN ---
+// --- MILEAGE SCREEN WITH GPS ---
 class MileageScreen extends StatefulWidget {
   const MileageScreen({super.key});
 
@@ -971,16 +991,116 @@ class _MileageScreenState extends State<MileageScreen> {
   bool _isTracking = false;
   bool _showForm = false;
   DateTime? _startTime;
+  Position? _startPosition;
   bool _isSaving = false;
 
-  void _startTrip() {
-    setState(() {
-      _isTracking = true;
-      _startTime = DateTime.now();
-    });
+  void _startTrip() async {
+    // For web, we'll use a simpler approach
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location services are disabled. You can still enter miles manually.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        setState(() {
+          _isTracking = true;
+          _startTime = DateTime.now();
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission denied. Enter miles manually.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          setState(() {
+            _isTracking = true;
+            _startTime = DateTime.now();
+          });
+          return;
+        }
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      ).timeout(const Duration(seconds: 5));
+      
+      setState(() {
+        _isTracking = true;
+        _startTime = DateTime.now();
+        _startPosition = position;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trip started! GPS tracking enabled.'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isTracking = true;
+        _startTime = DateTime.now();
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('GPS unavailable. Please enter miles manually.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
-  void _stopTrip() {
+  void _stopTrip() async {
+    if (_startPosition != null) {
+      try {
+        final endPosition = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        ).timeout(const Duration(seconds: 5));
+
+        // Calculate distance in miles
+        final distanceInMeters = Geolocator.distanceBetween(
+          _startPosition!.latitude,
+          _startPosition!.longitude,
+          endPosition.latitude,
+          endPosition.longitude,
+        );
+        final distanceInMiles = (distanceInMeters / 1609.344).toStringAsFixed(2);
+
+        _milesCtrl.text = distanceInMiles;
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Distance tracked: $distanceInMiles miles'), backgroundColor: Colors.green),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not calculate distance. Please enter manually.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    }
+
     setState(() {
       _isTracking = false;
       _showForm = true;
@@ -1002,11 +1122,13 @@ class _MileageScreenState extends State<MileageScreen> {
         'miles': double.parse(_milesCtrl.text),
         'purpose': _purposeCtrl.text.trim(),
         'timestamp': FieldValue.serverTimestamp(),
+        'gpsTracked': _startPosition != null,
       });
 
       _locationCtrl.clear();
       _milesCtrl.clear();
       _purposeCtrl.clear();
+      _startPosition = null;
 
       setState(() => _showForm = false);
 
@@ -1055,14 +1177,21 @@ class _MileageScreenState extends State<MileageScreen> {
                       Icon(_isTracking ? Icons.location_on : Icons.location_off, size: 64, color: _isTracking ? Colors.green : Colors.grey),
                       const SizedBox(height: 16),
                       Text(
-                        _isTracking ? "Tracking Active" : "Not Tracking",
+                        _isTracking ? "GPS Tracking Active" : "Not Tracking",
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _isTracking ? Colors.green : Colors.grey),
                       ),
+                      if (_isTracking && _startPosition != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          "Started: ${DateFormat('h:mm a').format(_startTime!)}",
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: _isTracking ? _stopTrip : _startTrip,
                         icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
-                        label: Text(_isTracking ? "Stop Trip" : "Start Trip"),
+                        label: Text(_isTracking ? "Stop Trip" : "Start GPS Trip"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _isTracking ? Colors.red : Colors.green,
                           foregroundColor: Colors.white,
@@ -1083,7 +1212,27 @@ class _MileageScreenState extends State<MileageScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Log Trip", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          Row(
+                            children: [
+                              const Text("Log Trip", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              if (_startPosition != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.gps_fixed, size: 14, color: Colors.green),
+                                      SizedBox(width: 4),
+                                      Text('GPS Tracked', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                           const SizedBox(height: 16),
                           TextFormField(
                             controller: _locationCtrl,
@@ -1093,7 +1242,13 @@ class _MileageScreenState extends State<MileageScreen> {
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _milesCtrl,
-                            decoration: const InputDecoration(labelText: "Miles", border: OutlineInputBorder()),
+                            decoration: InputDecoration(
+                              labelText: "Miles",
+                              border: const OutlineInputBorder(),
+                              suffixIcon: _startPosition != null 
+                                ? const Icon(Icons.gps_fixed, color: Colors.green)
+                                : null,
+                            ),
                             keyboardType: TextInputType.number,
                             validator: (v) {
                               if (v == null || v.isEmpty) return 'Required';
@@ -1145,11 +1300,17 @@ class _MileageScreenState extends State<MileageScreen> {
                         _EmptyState(
                           icon: Icons.directions_car,
                           title: "No trips yet",
-                          message: "Start tracking your mileage",
+                          message: "Start tracking your mileage with GPS",
                         )
                       else
                         ...trips.map((doc) => ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.location_on)),
+                          leading: CircleAvatar(
+                            backgroundColor: doc['gpsTracked'] == true ? Colors.green.shade100 : Colors.grey.shade100,
+                            child: Icon(
+                              doc['gpsTracked'] == true ? Icons.gps_fixed : Icons.location_on,
+                              color: doc['gpsTracked'] == true ? Colors.green : Colors.grey,
+                            ),
+                          ),
                           title: Text(doc['location'], style: const TextStyle(fontWeight: FontWeight.w600)),
                           subtitle: Text("${doc['purpose']} • ${doc['date']}"),
                           trailing: Text("${doc['miles']} mi", style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -1942,7 +2103,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
   }
 }
 
-// --- CALCULATOR SCREEN ---
+// --- CALCULATOR SCREEN WITH REGIONAL RATES ---
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
 
@@ -1954,13 +2115,140 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   final _signaturesCtrl = TextEditingController();
   final _milesCtrl = TextEditingController();
   double _estimate = 0;
+  
+  // Rates configuration
+  String _selectedCountry = 'USA';
+  double _signatureRate = 15.0;
+  double _mileageRate = 0.67;
+
+  final Map<String, Map<String, double>> _countryRates = {
+    'USA': {'signature': 15.0, 'mileage': 0.67},
+    'Canada': {'signature': 20.0, 'mileage': 0.68},
+    'UK': {'signature': 12.0, 'mileage': 0.45},
+    'Australia': {'signature': 18.0, 'mileage': 0.78},
+    'Custom': {'signature': 0.0, 'mileage': 0.0},
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedRates();
+  }
+
+  Future<void> _loadSavedRates() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _selectedCountry = prefs.getString('selected_country') ?? 'USA';
+      _signatureRate = prefs.getDouble('signature_rate') ?? 15.0;
+      _mileageRate = prefs.getDouble('mileage_rate') ?? 0.67;
+    });
+  }
+
+  Future<void> _saveRates() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selected_country', _selectedCountry);
+    await prefs.setDouble('signature_rate', _signatureRate);
+    await prefs.setDouble('mileage_rate', _mileageRate);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Rates saved!'), backgroundColor: Colors.green),
+      );
+    }
+  }
 
   void _calculate() {
     final sigs = int.tryParse(_signaturesCtrl.text) ?? 0;
     final miles = double.tryParse(_milesCtrl.text) ?? 0;
     setState(() {
-      _estimate = (sigs * 15) + (miles * 0.67);
+      _estimate = (sigs * _signatureRate) + (miles * _mileageRate);
     });
+  }
+
+  void _showRateSettings() {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Configure Rates'),
+          content: SizedBox(
+            width: 300,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedCountry,
+                  decoration: const InputDecoration(
+                    labelText: "Region/Country",
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _countryRates.keys.map((country) {
+                    return DropdownMenuItem(value: country, child: Text(country));
+                  }).toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      _selectedCountry = value!;
+                      if (value != 'Custom') {
+                        _signatureRate = _countryRates[value]!['signature']!;
+                        _mileageRate = _countryRates[value]!['mileage']!;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  initialValue: _signatureRate.toStringAsFixed(2),
+                  decoration: const InputDecoration(
+                    labelText: "Rate per Signature (\$)",
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  enabled: _selectedCountry == 'Custom',
+                  onChanged: (value) {
+                    setDialogState(() {
+                      _signatureRate = double.tryParse(value) ?? 15.0;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  initialValue: _mileageRate.toStringAsFixed(2),
+                  decoration: const InputDecoration(
+                    labelText: "Rate per Mile/KM (\$)",
+                    border: OutlineInputBorder(),
+                    helperText: "IRS standard rate (2025): \$0.67/mile",
+                  ),
+                  keyboardType: TextInputType.number,
+                  enabled: _selectedCountry == 'Custom',
+                  onChanged: (value) {
+                    setDialogState(() {
+                      _mileageRate = double.tryParse(value) ?? 0.67;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                setState(() {
+                  // Update main state
+                });
+                _saveRates();
+                _calculate();
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -1976,14 +2264,44 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("Fee Estimator", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Fee Estimator", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                      IconButton(
+                        onPressed: _showRateSettings,
+                        icon: const Icon(Icons.settings),
+                        tooltip: 'Configure Rates',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 16, color: Colors.indigo),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Region: $_selectedCountry | \$${_signatureRate.toStringAsFixed(2)}/signature • \$${_mileageRate.toStringAsFixed(2)}/mile",
+                            style: const TextStyle(fontSize: 12, color: Colors.indigo),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   TextField(
                     controller: _signaturesCtrl,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: "Number of Signatures",
-                      border: OutlineInputBorder(),
-                      helperText: "\$15 per signature",
+                      border: const OutlineInputBorder(),
+                      helperText: "\$${_signatureRate.toStringAsFixed(2)} per signature",
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (_) => _calculate(),
@@ -1991,10 +2309,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _milesCtrl,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: "Miles Driven",
-                      border: OutlineInputBorder(),
-                      helperText: "\$0.67 per mile",
+                      border: const OutlineInputBorder(),
+                      helperText: "\$${_mileageRate.toStringAsFixed(2)} per mile",
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (_) => _calculate(),
@@ -2003,16 +2321,30 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.indigo.shade50,
+                      gradient: LinearGradient(
+                        colors: [Colors.indigo.shade600, Colors.indigo.shade400],
+                      ),
                       borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.indigo.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Estimated Total:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text("\$${_estimate.toStringAsFixed(2)}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo)),
+                        const Text("Estimated Total:", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        Text("\$${_estimate.toStringAsFixed(2)}", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "💡 Tip: Configure rates for your region using the settings button above",
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
@@ -2048,21 +2380,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final doc = await FirebaseFirestore.instance
-        .doc('artifacts/notaryflow-v2/users/$uid/profile/business_info')
-        .get();
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final doc = await FirebaseFirestore.instance
+          .doc('artifacts/notaryflow-v2/users/$uid/profile/business_info')
+          .get();
 
-    if (doc.exists) {
-      setState(() {
-        _businessNameCtrl.text = doc['businessName'] ?? '';
-        _emailCtrl.text = doc['email'] ?? '';
-        _phoneCtrl.text = doc['phone'] ?? '';
-        _addressCtrl.text = doc['address'] ?? '';
-        _isLoading = false;
-      });
-    } else {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        if (doc.exists) {
+          setState(() {
+            _businessNameCtrl.text = doc['businessName'] ?? '';
+            _emailCtrl.text = doc['email'] ?? '';
+            _phoneCtrl.text = doc['phone'] ?? '';
+            _addressCtrl.text = doc['address'] ?? '';
+            _isLoading = false;
+          });
+        } else {
+          setState(() => _isLoading = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
