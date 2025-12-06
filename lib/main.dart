@@ -4,20 +4,15 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:universal_html/html.dart' as html;
-import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import 'screens/journal_screen.dart';
 import 'utils/currency_service.dart';
 
@@ -49,17 +44,182 @@ class NotaryFlowApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Modern Material 3 Color Scheme
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF4F46E5), // Indigo
+      brightness: Brightness.light,
+    );
+
     return MaterialApp(
       title: 'NotaryFlow',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: colorScheme,
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        
+        // Typography with proper sizing
+        textTheme: const TextTheme(
+          headlineLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+          headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          bodyLarge: TextStyle(fontSize: 16, height: 1.5),
+          bodyMedium: TextStyle(fontSize: 14, height: 1.5),
+          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        
+        // Card Theme - Modern elevated cards
         cardTheme: CardThemeData(
-          surfaceTintColor: Colors.white,
+          elevation: 0,
           color: Colors.white,
-          elevation: 2,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade200, width: 1),
+          ),
+          margin: EdgeInsets.zero,
+        ),
+        
+        // Elevated Button - 48dp touch target minimum
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(88, 52), // 52dp height for easy touch
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 0,
+            backgroundColor: colorScheme.primary,
+            foregroundColor: Colors.white,
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
+        
+        // Filled Button
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(88, 52),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
+        
+        // Outlined Button
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(88, 52),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            side: BorderSide(color: colorScheme.outline),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
+        
+        // Text Button
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
+        
+        // Input Decoration - Touch-friendly text fields
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.error),
+          ),
+          labelStyle: TextStyle(color: Colors.grey.shade700),
+          hintStyle: TextStyle(color: Colors.grey.shade500),
+        ),
+        
+        // List Tile - Proper touch target
+        listTileTheme: const ListTileThemeData(
+          minVerticalPadding: 12,
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
+        
+        // Bottom Navigation - Touch-friendly
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: colorScheme.primary,
+          unselectedItemColor: Colors.grey.shade500,
+          selectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
+          elevation: 8,
+          backgroundColor: Colors.white,
+        ),
+        
+        // Floating Action Button
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        
+        // App Bar
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 0,
+          centerTitle: false,
+          titleTextStyle: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        
+        // Divider
+        dividerTheme: DividerThemeData(
+          color: Colors.grey.shade200,
+          thickness: 1,
+          space: 1,
+        ),
+        
+        // Chip Theme - Touch-friendly
+        chipTheme: ChipThemeData(
+          labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        
+        // Dialog Theme
+        dialogTheme: DialogThemeData(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titleTextStyle: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        
+        // Snackbar
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          contentTextStyle: const TextStyle(fontSize: 14),
         ),
       ),
       home: const AuthWrapper(),
@@ -635,24 +795,113 @@ class _MainLayoutState extends State<MainLayout> {
           ),
           bottomNavigationBar: isWide
               ? null
-              : BottomNavigationBar(
-                  currentIndex: activeIndex,
-                  onTap: (index) => setState(() => _selectedIndex = index),
-                  type: BottomNavigationBarType.fixed,
-                  selectedItemColor: Colors.indigo,
-                  unselectedItemColor: Colors.grey,
-                  selectedFontSize: 12,
-                  unselectedFontSize: 11,
-                  items: const [
-                    BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Home'),
-                    BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Invoices'),
-                    BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Journal'),
-                    BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Mileage'),
-                    BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: 'Menu'),
-                  ],
+              : Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _NavBarItem(
+                            icon: Icons.dashboard_rounded,
+                            label: 'Home',
+                            isSelected: activeIndex == 0,
+                            onTap: () => setState(() => _selectedIndex = 0),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.receipt_long_rounded,
+                            label: 'Invoices',
+                            isSelected: activeIndex == 1,
+                            onTap: () => setState(() => _selectedIndex = 1),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.book_rounded,
+                            label: 'Journal',
+                            isSelected: activeIndex == 2,
+                            onTap: () => setState(() => _selectedIndex = 2),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.directions_car_rounded,
+                            label: 'Mileage',
+                            isSelected: activeIndex == 3,
+                            onTap: () => setState(() => _selectedIndex = 3),
+                          ),
+                          _NavBarItem(
+                            icon: Icons.grid_view_rounded,
+                            label: 'More',
+                            isSelected: activeIndex == 4,
+                            onTap: () => setState(() => _selectedIndex = 4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
         );
       },
+    );
+  }
+}
+
+// Custom Nav Bar Item with touch-friendly size (48dp minimum)
+class _NavBarItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  
+  const _NavBarItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected 
+        ? Theme.of(context).colorScheme.primary 
+        : Colors.grey.shade500;
+    
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 64, minHeight: 56), // Touch-friendly
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: isSelected 
+            ? BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(16),
+              )
+            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -713,105 +962,336 @@ class DashboardScreen extends StatelessWidget {
                 double netProfit = paidIncome - totalExpenses;
 
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
+                      // Welcome header
+                      Text(
+                        'Welcome back! 👋',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Here\'s your business overview',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Stats Grid - Responsive
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth > 600;
+                          final crossAxisCount = isWide ? 3 : 2;
+                          
+                          return GridView.count(
+                            crossAxisCount: crossAxisCount,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: isWide ? 1.5 : 1.3,
+                            children: [
+                              _ModernStatCard(
+                                title: "Revenue",
+                                value: "${CurrencyService().currencySymbol}${totalIncome.toStringAsFixed(0)}",
+                                icon: Icons.trending_up_rounded,
+                                gradient: const [Color(0xFF10B981), Color(0xFF059669)],
+                              ),
+                              _ModernStatCard(
+                                title: "Net Profit",
+                                value: "${CurrencyService().currencySymbol}${netProfit.toStringAsFixed(0)}",
+                                icon: Icons.account_balance_wallet_rounded,
+                                gradient: const [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                              ),
+                              _ModernStatCard(
+                                title: "Expenses",
+                                value: "${CurrencyService().currencySymbol}${totalExpenses.toStringAsFixed(0)}",
+                                icon: Icons.receipt_long_rounded,
+                                gradient: const [Color(0xFFEF4444), Color(0xFFDC2626)],
+                              ),
+                              _ModernStatCard(
+                                title: "Pending",
+                                value: "${CurrencyService().currencySymbol}${pendingIncome.toStringAsFixed(0)}",
+                                icon: Icons.schedule_rounded,
+                                gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+                              ),
+                              _ModernStatCard(
+                                title: "Tax Deduction",
+                                value: "${CurrencyService().currencySymbol}${taxDed.toStringAsFixed(0)}",
+                                icon: Icons.directions_car_rounded,
+                                gradient: const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                              ),
+                              _ModernStatCard(
+                                title: "Total Miles",
+                                value: "${totalMiles.toStringAsFixed(0)} mi",
+                                icon: Icons.route_rounded,
+                                gradient: const [Color(0xFF06B6D4), Color(0xFF0891B2)],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Recent Invoices Section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _StatCard(title: "Total Revenue", value: "${CurrencyService().currencySymbol}${totalIncome.toStringAsFixed(2)}", icon: Icons.attach_money, color: Colors.green),
-                          _StatCard(title: "Net Profit", value: "${CurrencyService().currencySymbol}${netProfit.toStringAsFixed(2)}", icon: Icons.account_balance_wallet, color: Colors.blue),
-                          _StatCard(title: "Expenses", value: "${CurrencyService().currencySymbol}${totalExpenses.toStringAsFixed(2)}", icon: Icons.money_off, color: Colors.red),
-                          _StatCard(title: "Pending", value: "${CurrencyService().currencySymbol}${pendingIncome.toStringAsFixed(2)}", icon: Icons.access_time, color: Colors.orange),
-                          _StatCard(title: "Tax Deductions", value: "${CurrencyService().currencySymbol}${taxDed.toStringAsFixed(2)}", icon: Icons.directions_car, color: Colors.purple),
+                          Text(
+                            "Recent Invoices",
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          if (invoices.isNotEmpty)
+                            TextButton.icon(
+                              onPressed: () {
+                                // Navigate to invoices - handled by main nav
+                              },
+                              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                              label: const Text("View All"),
+                            ),
                         ],
                       ),
-                  const SizedBox(height: 24),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Recent Invoices", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 16),
-                          if (invoices.isEmpty)
-                            _EmptyState(
-                              icon: Icons.receipt_long,
-                              title: "No invoices yet",
-                              message: "Create your first invoice to get started!",
-                            )
-                          else
-                            ...invoices.take(5).map((doc) => ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.indigo.shade50,
-                                child: const Icon(Icons.receipt, color: Colors.indigo),
-                              ),
-                              title: Text(doc['description'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: Text(doc['date'] ?? ''),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                      const SizedBox(height: 16),
+                      
+                      if (invoices.isEmpty)
+                        const _EmptyStateCard(
+                          icon: Icons.receipt_long_rounded,
+                          title: "No invoices yet",
+                          message: "Create your first invoice to start tracking your earnings!",
+                          actionLabel: "Create Invoice",
+                        )
+                      else
+                        Card(
+                          child: Column(
+                            children: invoices.take(5).map((doc) {
+                              final isLast = doc == invoices.take(5).last;
+                              return Column(
                                 children: [
-                                  Text("${CurrencyService().currencySymbol}${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                  _StatusBadge(status: doc['status']),
+                                  _ModernInvoiceListTile(
+                                    clientName: doc['description'] ?? 'Unknown',
+                                    date: doc['date'] ?? '',
+                                    amount: "${CurrencyService().currencySymbol}${doc['amount']}",
+                                    status: doc['status'],
+                                  ),
+                                  if (!isLast) Divider(height: 1, indent: 72, color: Colors.grey.shade200),
                                 ],
-                              ),
-                            )),
-                        ],
-                      ),
-                    ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           },
         );
       },
     );
-      },
+  }
+}
+
+// Modern Stat Card with gradient
+class _ModernStatCard extends StatelessWidget {
+  final String title, value;
+  final IconData icon;
+  final List<Color> gradient;
+  
+  const _ModernStatCard({
+    required this.title, 
+    required this.value, 
+    required this.icon, 
+    required this.gradient,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: gradient[0].withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.white.withOpacity(0.9),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title, value;
-  final IconData icon;
-  final Color color;
-  const _StatCard({required this.title, required this.value, required this.icon, required this.color});
+// Modern Invoice List Tile
+class _ModernInvoiceListTile extends StatelessWidget {
+  final String clientName, date, amount, status;
+  
+  const _ModernInvoiceListTile({
+    required this.clientName,
+    required this.date,
+    required this.amount,
+    required this.status,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 280, maxWidth: 350),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-        ),
-        child: Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.receipt_rounded,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  clientName,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  date,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                amount,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 4),
+              _ModernStatusBadge(status: status),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Empty State Card (better than just centered text)
+class _EmptyStateCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  
+  const _EmptyStateCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(
+                icon,
+                size: 40,
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+              ),
             ),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            if (actionLabel != null) ...[
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: onAction,
+                icon: const Icon(Icons.add_rounded),
+                label: Text(actionLabel!),
+              ),
+            ],
           ],
         ),
       ),
@@ -819,35 +1299,41 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
+// Modern Status Badge
+class _ModernStatusBadge extends StatelessWidget {
   final String status;
-  const _StatusBadge({required this.status});
+  const _ModernStatusBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    Color color;
+    Color bgColor;
+    Color textColor;
+    
     switch (status) {
       case 'Paid':
-        color = Colors.green;
+        bgColor = const Color(0xFFD1FAE5);
+        textColor = const Color(0xFF065F46);
         break;
       case 'Overdue':
-        color = Colors.red;
+        bgColor = const Color(0xFFFEE2E2);
+        textColor = const Color(0xFF991B1B);
         break;
       default:
-        color = Colors.orange;
+        bgColor = const Color(0xFFFEF3C7);
+        textColor = const Color(0xFF92400E);
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         status,
         style: TextStyle(
-          fontSize: 11,
-          color: color,
+          fontSize: 12,
+          color: textColor,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -1046,21 +1532,66 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text("Invoice Status", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text("Invoice Status", style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
+              Row(
                 children: [
-                  _StatCard(title: "Paid", value: "${statusCounts['Paid']}", icon: Icons.check_circle, color: Colors.green),
-                  _StatCard(title: "Pending", value: "${statusCounts['Pending']}", icon: Icons.access_time, color: Colors.orange),
-                  _StatCard(title: "Overdue", value: "${statusCounts['Overdue']}", icon: Icons.warning, color: Colors.red),
+                  Expanded(child: _StatusSummaryCard(title: "Paid", value: "${statusCounts['Paid']}", icon: Icons.check_circle_rounded, color: Colors.green)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _StatusSummaryCard(title: "Pending", value: "${statusCounts['Pending']}", icon: Icons.schedule_rounded, color: Colors.orange)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _StatusSummaryCard(title: "Overdue", value: "${statusCounts['Overdue']}", icon: Icons.warning_rounded, color: Colors.red)),
                 ],
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+// Status Summary Card for Analytics
+class _StatusSummaryCard extends StatelessWidget {
+  final String title, value;
+  final IconData icon;
+  final Color color;
+  
+  const _StatusSummaryCard({
+    required this.title, 
+    required this.value, 
+    required this.icon, 
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withAlpha(50)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1133,7 +1664,7 @@ class _LegendItem extends StatelessWidget {
   }
 }
 
-// --- MILEAGE SCREEN WITH GPS & GOOGLE MAPS ---
+// --- MILEAGE SCREEN - IMPROVED ---
 class MileageScreen extends StatefulWidget {
   const MileageScreen({super.key});
 
@@ -1143,166 +1674,116 @@ class MileageScreen extends StatefulWidget {
 
 class _MileageScreenState extends State<MileageScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _locationCtrl = TextEditingController();
+  final _sourceCtrl = TextEditingController();
+  final _destinationCtrl = TextEditingController();
+  final _clientCtrl = TextEditingController();
   final _milesCtrl = TextEditingController();
   final _purposeCtrl = TextEditingController();
-
-  bool _isTracking = false;
-  bool _showForm = false;
-  DateTime? _startTime;
-  Position? _startPosition;
-  bool _isSaving = false;
-  String? _gpsError;
   
-  GoogleMapController? _mapController;
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
-  final List<LatLng> _routePoints = [];
-  StreamSubscription<Position>? _positionStream;
+  bool _showForm = false;
+  bool _isSaving = false;
+  bool _isCalculating = false;
+  String _trackingMethod = 'manual'; // 'manual', 'calculated'
 
-  static const CameraPosition _kInitialPosition = CameraPosition(
-    target: LatLng(37.7749, -122.4194), // San Francisco Default
-    zoom: 14.4746,
-  );
-
-  // Disable GPS tracking on Web
-  bool get _isGpsAvailable => !kIsWeb;
+  // Common trip purposes for quick selection
+  final List<String> _quickPurposes = [
+    'Loan Signing',
+    'Real Estate Closing',
+    'General Notarization',
+    'Hospital/Care Facility',
+    'Attorney Office',
+    'Bank Documents',
+    'Other',
+  ];
 
   @override
   void dispose() {
-    _positionStream?.cancel();
-    _mapController?.dispose();
+    _sourceCtrl.dispose();
+    _destinationCtrl.dispose();
+    _clientCtrl.dispose();
+    _milesCtrl.dispose();
+    _purposeCtrl.dispose();
     super.dispose();
   }
 
-  void _startTrip() async {
-    setState(() => _gpsError = null);
-    
+  // Calculate distance using coordinates (simplified - in production use Google Distance Matrix API)
+  Future<void> _calculateDistance() async {
+    if (_sourceCtrl.text.isEmpty || _destinationCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both source and destination'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    setState(() => _isCalculating = true);
+
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _gpsError = 'Location services are disabled. Please enable them or use Manual Entry.');
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() => _gpsError = 'Location permission denied. Please use Manual Entry.');
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        setState(() => _gpsError = 'Location permissions are permanently denied. Please use Manual Entry.');
-        return;
-      }
-
-      // Web specific check
-      if (kIsWeb && html.window.location.protocol != 'https:' && !html.window.location.hostname!.contains('localhost')) {
-         setState(() => _gpsError = 'GPS requires HTTPS on web. Please use Manual Entry.');
-         return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      ).timeout(const Duration(seconds: 10));
-      
-      setState(() {
-        _isTracking = true;
-        _startTime = DateTime.now();
-        _startPosition = position;
-        _gpsError = null;
-        _routePoints.clear();
-        _routePoints.add(LatLng(position.latitude, position.longitude));
-        _markers.add(Marker(
-          markerId: const MarkerId('start'),
-          position: LatLng(position.latitude, position.longitude),
-          infoWindow: const InfoWindow(title: 'Start Point'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        ));
-      });
-
-      // Move map to start
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(
-        LatLng(position.latitude, position.longitude), 16
-      ));
-
-      // Start listening to position updates
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 10,
+      // For now, show a dialog to manually enter or estimate
+      // In production, you'd use Google Distance Matrix API
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Enter Distance'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'From: ${_sourceCtrl.text}\nTo: ${_destinationCtrl.text}',
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '💡 Tip: Use Google Maps to find the exact distance, then enter it below.',
+                style: TextStyle(fontSize: 12, color: Colors.blue),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _milesCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Distance (miles)',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g., 12.5',
+                ),
+                keyboardType: TextInputType.number,
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final query = Uri.encodeComponent('${_sourceCtrl.text} to ${_destinationCtrl.text}');
+                  final url = 'https://www.google.com/maps/dir/?api=1&origin=${Uri.encodeComponent(_sourceCtrl.text)}&destination=${Uri.encodeComponent(_destinationCtrl.text)}';
+                  if (kIsWeb) {
+                    html.window.open(url, '_blank');
+                  } else {
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  }
+                },
+                icon: const Icon(Icons.map, size: 18),
+                label: const Text('Open in Google Maps'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _trackingMethod = 'calculated');
+              },
+              child: const Text('Confirm'),
+            ),
+          ],
         ),
-      ).listen((Position pos) {
-        setState(() {
-          _routePoints.add(LatLng(pos.latitude, pos.longitude));
-          _polylines.add(Polyline(
-            polylineId: const PolylineId('route'),
-            points: _routePoints,
-            color: Colors.blue,
-            width: 5,
-          ));
-        });
-        _mapController?.animateCamera(CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)));
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Trip started! GPS tracking enabled.'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _gpsError = 'GPS Error: $e. Please use Manual Entry.';
-      });
+      );
+    } finally {
+      setState(() => _isCalculating = false);
     }
-  }
-
-  void _stopTrip() async {
-    _positionStream?.cancel();
-    
-    if (_startPosition != null) {
-      try {
-        final endPosition = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        ).timeout(const Duration(seconds: 10));
-
-        // Calculate distance in miles
-        final distanceInMeters = Geolocator.distanceBetween(
-          _startPosition!.latitude,
-          _startPosition!.longitude,
-          endPosition.latitude,
-          endPosition.longitude,
-        );
-        final distanceInMiles = (distanceInMeters / 1609.344).toStringAsFixed(2);
-
-        _milesCtrl.text = distanceInMiles;
-        
-        setState(() {
-          _markers.add(Marker(
-            markerId: const MarkerId('end'),
-            position: LatLng(endPosition.latitude, endPosition.longitude),
-            infoWindow: const InfoWindow(title: 'End Point'),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          ));
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Distance tracked: $distanceInMiles miles'), backgroundColor: Colors.green),
-          );
-        }
-      } catch (e) {
-        setState(() => _gpsError = 'Could not calculate end position. Please enter miles manually.');
-      }
-    }
-
-    setState(() {
-      _isTracking = false;
-      _showForm = true;
-    });
   }
 
   Future<void> _saveTrip() async {
@@ -1312,31 +1793,47 @@ class _MileageScreenState extends State<MileageScreen> {
 
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
+      final miles = double.parse(_milesCtrl.text);
+      
       await FirebaseFirestore.instance
           .collection('artifacts/notaryflow-v2/users/$uid/trips')
           .add({
         'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-        'location': _locationCtrl.text.trim(),
-        'miles': double.parse(_milesCtrl.text),
+        'source': _sourceCtrl.text.trim(),
+        'destination': _destinationCtrl.text.trim(),
+        'location': '${_sourceCtrl.text.trim()} → ${_destinationCtrl.text.trim()}',
+        'client': _clientCtrl.text.trim(),
+        'miles': miles,
         'purpose': _purposeCtrl.text.trim(),
         'timestamp': FieldValue.serverTimestamp(),
-        'gpsTracked': _startPosition != null,
+        'trackingMethod': _trackingMethod,
+        'taxDeduction': miles * 0.67, // 2024 IRS rate
       });
 
-      _locationCtrl.clear();
+      // Clear form
+      _sourceCtrl.clear();
+      _destinationCtrl.clear();
+      _clientCtrl.clear();
       _milesCtrl.clear();
       _purposeCtrl.clear();
-      _startPosition = null;
-      _gpsError = null;
-      _markers.clear();
-      _polylines.clear();
-      _routePoints.clear();
-
-      setState(() => _showForm = false);
+      
+      setState(() {
+        _showForm = false;
+        _trackingMethod = 'manual';
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Row(children: [Icon(Icons.check, color: Colors.white), SizedBox(width: 8), Text('Trip saved!')]), backgroundColor: Colors.green),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Trip saved! Tax deduction: \$${(miles * 0.67).toStringAsFixed(2)}'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -1360,196 +1857,75 @@ class _MileageScreenState extends State<MileageScreen> {
           .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final trips = snapshot.data!.docs;
+        
+        // Calculate totals
+        double totalMiles = 0;
+        double totalDeductions = 0;
+        for (var doc in trips) {
+          final data = doc.data();
+          totalMiles += (data['miles'] as num?)?.toDouble() ?? 0;
+          totalDeductions += (data['taxDeduction'] as num?)?.toDouble() ?? ((data['miles'] as num?)?.toDouble() ?? 0) * 0.67;
+        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // --- GPS / MANUAL TOGGLE CARD ---
-              Card(
-                color: Colors.white,
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                    // Map View
-                    SizedBox(
-                      height: 250,
-                      width: double.infinity,
-                      child: Stack(
-                        children: [
-                          if (_isGpsAvailable)
-                            GoogleMap(
-                              mapType: MapType.normal,
-                              initialCameraPosition: _kInitialPosition,
-                              onMapCreated: (GoogleMapController controller) {
-                                _mapController = controller;
-                                // Try to get current location to center map initially
-                                Geolocator.getCurrentPosition().then((pos) {
-                                  controller.animateCamera(CameraUpdate.newLatLng(LatLng(pos.latitude, pos.longitude)));
-                                }).catchError((e) {});
-                              },
-                              markers: _markers,
-                              polylines: _polylines,
-                              myLocationEnabled: true,
-                              myLocationButtonEnabled: true,
-                            )
-                          else
-                            Container(
-                              color: Colors.grey.shade100,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.map, size: 64, color: Colors.grey.shade400),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'GPS Tracking Not Available on Web',
-                                      style: TextStyle(fontSize: 16, color: Colors.grey.shade600, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Please use Manual Entry or download the mobile app',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          if (_gpsError != null)
-                            Container(
-                              color: Colors.white.withOpacity(0.9),
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Text(_gpsError!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+              // --- SUMMARY CARDS ---
+              Row(
+                children: [
+                  Expanded(
+                    child: _MileageSummaryCard(
+                      icon: Icons.route,
+                      title: 'Total Miles',
+                      value: '${totalMiles.toStringAsFixed(1)} mi',
+                      color: Colors.blue,
                     ),
-                    
-                    Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        children: [
-                          if (!_showForm) ...[
-                            const Text("Choose Tracking Method", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                // GPS Button
-                                Expanded(
-                                  child: Column(
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: _isGpsAvailable ? (_isTracking ? _stopTrip : _startTrip) : null,
-                                        style: ElevatedButton.styleFrom(
-                                          shape: const CircleBorder(),
-                                          padding: const EdgeInsets.all(28),
-                                          backgroundColor: _isTracking ? Colors.red : Colors.green,
-                                          foregroundColor: Colors.white,
-                                          elevation: 4,
-                                        ),
-                                        child: Icon(_isTracking ? Icons.stop : Icons.gps_fixed, size: 36),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        _isTracking ? "Stop GPS" : "GPS Tracking",
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        _isGpsAvailable
-                                            ? (_isTracking ? "Tap to finish" : "Auto-calculate miles")
-                                            : "Mobile Only",
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                // Manual Button
-                                Expanded(
-                                  child: Column(
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: _isTracking ? null : () {
-                                          setState(() {
-                                            _showForm = true;
-                                            _startPosition = null;
-                                          });
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          shape: const CircleBorder(),
-                                          padding: const EdgeInsets.all(28),
-                                          backgroundColor: Colors.blue, // Changed to Blue to pop
-                                          foregroundColor: Colors.white,
-                                          elevation: 4,
-                                        ),
-                                        child: const Icon(Icons.edit, size: 36), // Changed to Pencil icon
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const Text(
-                                        "Manual Entry",
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "Enter miles & tax",
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_isTracking) ...[
-                              const SizedBox(height: 24),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.green.shade200),
-                                ),
-                                child: Column(
-                                  children: [
-                                    const Icon(Icons.navigation, color: Colors.green, size: 32),
-                                    const SizedBox(height: 8),
-                                    const Text("Tracking in Progress...", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                    const SizedBox(height: 4),
-                                    Text("Started: ${DateFormat('h:mm a').format(_startTime!)}", style: const TextStyle(color: Colors.grey)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _MileageSummaryCard(
+                      icon: Icons.savings,
+                      title: 'Tax Deduction',
+                      value: '\$${totalDeductions.toStringAsFixed(2)}',
+                      color: Colors.green,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              
+              // --- ADD TRIP BUTTON ---
+              if (!_showForm)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => setState(() => _showForm = true),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Log New Trip'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
               
               // --- ENTRY FORM ---
               if (_showForm) ...[
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(20.0),
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -1557,88 +1933,156 @@ class _MileageScreenState extends State<MileageScreen> {
                         children: [
                           Row(
                             children: [
-                              const Text("Log Trip Details", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const Icon(Icons.directions_car, color: Colors.indigo),
+                              const SizedBox(width: 8),
+                              const Text("Log Trip", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                               const Spacer(),
-                              if (_startPosition != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Row(
-                                    children: [
-                                      Icon(Icons.gps_fixed, size: 14, color: Colors.green),
-                                      SizedBox(width: 4),
-                                      Text('GPS Tracked', style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                )
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.indigo.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Row(
-                                    children: [
-                                      Icon(Icons.edit, size: 14, color: Colors.indigo),
-                                      SizedBox(width: 4),
-                                      Text('Manual Entry', style: TextStyle(fontSize: 11, color: Colors.indigo, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => setState(() => _showForm = false),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _locationCtrl,
-                            decoration: const InputDecoration(labelText: "Location/Client Name", border: OutlineInputBorder()),
-                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                          ),
+                          const Divider(),
                           const SizedBox(height: 12),
+                          
+                          // Source Address
                           TextFormField(
-                            controller: _milesCtrl,
-                            decoration: InputDecoration(
-                              labelText: "Distance (Miles/KM)",
-                              border: const OutlineInputBorder(),
-                              suffixIcon: _startPosition != null 
-                                ? const Icon(Icons.gps_fixed, color: Colors.green)
-                                : null,
-                              helperText: "Enter total distance for round trip if applicable",
+                            controller: _sourceCtrl,
+                            decoration: const InputDecoration(
+                              labelText: "Starting Point (Your Location)",
+                              hintText: "e.g., 123 Main St, City, State",
+                              prefixIcon: Icon(Icons.trip_origin, color: Colors.green),
+                              border: OutlineInputBorder(),
                             ),
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              if (v == null || v.isEmpty) return 'Required';
-                              final miles = double.tryParse(v);
-                              if (miles == null || miles <= 0) return 'Enter valid distance';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _purposeCtrl,
-                            decoration: const InputDecoration(labelText: "Purpose", border: OutlineInputBorder()),
                             validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
+                          
+                          // Destination Address
+                          TextFormField(
+                            controller: _destinationCtrl,
+                            decoration: const InputDecoration(
+                              labelText: "Destination (Client Location)",
+                              hintText: "e.g., 456 Oak Ave, City, State",
+                              prefixIcon: Icon(Icons.location_on, color: Colors.red),
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Client Name
+                          TextFormField(
+                            controller: _clientCtrl,
+                            decoration: const InputDecoration(
+                              labelText: "Client Name",
+                              prefixIcon: Icon(Icons.person),
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Miles with Calculate Button
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _isSaving ? null : _saveTrip,
-                                  child: _isSaving
-                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                      : const Text("Save Trip"),
+                                child: TextFormField(
+                                  controller: _milesCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: "Distance (Miles)",
+                                    prefixIcon: Icon(Icons.speed),
+                                    border: OutlineInputBorder(),
+                                    helperText: "One-way distance",
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Required';
+                                    final miles = double.tryParse(v);
+                                    if (miles == null || miles <= 0) return 'Enter valid distance';
+                                    return null;
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              TextButton(
-                                onPressed: () => setState(() => _showForm = false),
-                                child: const Text("Cancel"),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: ElevatedButton.icon(
+                                  onPressed: _isCalculating ? null : _calculateDistance,
+                                  icon: _isCalculating 
+                                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : const Icon(Icons.calculate, size: 18),
+                                  label: const Text('Get Distance'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+                                  ),
+                                ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Purpose Dropdown
+                          DropdownButtonFormField<String>(
+                            value: _purposeCtrl.text.isEmpty ? null : _purposeCtrl.text,
+                            decoration: const InputDecoration(
+                              labelText: "Purpose",
+                              prefixIcon: Icon(Icons.work),
+                              border: OutlineInputBorder(),
+                            ),
+                            items: _quickPurposes.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _purposeCtrl.text = value);
+                              }
+                            },
+                            validator: (v) => v == null ? 'Select a purpose' : null,
+                          ),
+                          const SizedBox(height: 8),
+                          
+                          // Tax Deduction Preview
+                          if (_milesCtrl.text.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.savings, color: Colors.green.shade700),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Tax Deduction: \$${((double.tryParse(_milesCtrl.text) ?? 0) * 0.67).toStringAsFixed(2)}',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '@\$0.67/mi',
+                                    style: TextStyle(fontSize: 12, color: Colors.green.shade600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          
+                          // Save Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : _saveTrip,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                backgroundColor: Colors.indigo,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: _isSaving
+                                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Text("Save Trip", style: TextStyle(fontSize: 16)),
+                            ),
                           ),
                         ],
                       ),
@@ -1647,33 +2091,73 @@ class _MileageScreenState extends State<MileageScreen> {
                 ),
                 const SizedBox(height: 24),
               ],
+              
+              // --- TRIP HISTORY ---
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text("Trip History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Row(
+                        children: [
+                          const Text("Trip History", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          Text('${trips.length} trips', style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
                       const SizedBox(height: 16),
                       if (trips.isEmpty)
                         _EmptyState(
                           icon: Icons.directions_car,
-                          title: "No trips yet",
-                          message: "Start tracking your mileage",
+                          title: "No trips logged yet",
+                          message: "Tap 'Log New Trip' to start tracking your mileage",
                         )
                       else
-                        ...trips.map((doc) => ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: doc['gpsTracked'] == true ? Colors.green.shade100 : Colors.indigo.shade100,
-                            child: Icon(
-                              doc['gpsTracked'] == true ? Icons.gps_fixed : Icons.edit,
-                              color: doc['gpsTracked'] == true ? Colors.green : Colors.indigo,
+                        ...trips.map((doc) {
+                          final data = doc.data();
+                          // Safely access fields with defaults
+                          final location = data['location'] as String? ?? 'Unknown';
+                          final purpose = data['purpose'] as String? ?? '';
+                          final date = data['date'] as String? ?? '';
+                          final miles = (data['miles'] as num?)?.toDouble() ?? 0;
+                          final trackingMethod = data['trackingMethod'] as String? ?? (data['gpsTracked'] == true ? 'gps' : 'manual');
+                          
+                          return Dismissible(
+                            key: Key(doc.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              color: Colors.red,
+                              child: const Icon(Icons.delete, color: Colors.white),
                             ),
-                          ),
-                          title: Text(doc['location'], style: const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text("${doc['purpose']} • ${doc['date']}"),
-                          trailing: Text("${doc['miles']} mi", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        )),
+                            onDismissed: (_) => doc.reference.delete(),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: trackingMethod == 'gps' ? Colors.green.shade100 : Colors.indigo.shade100,
+                                child: Icon(
+                                  trackingMethod == 'gps' ? Icons.gps_fixed : Icons.edit_road,
+                                  color: trackingMethod == 'gps' ? Colors.green : Colors.indigo,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                location.length > 40 ? '${location.substring(0, 40)}...' : location,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              ),
+                              subtitle: Text('$purpose • $date', style: const TextStyle(fontSize: 12)),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text('${miles.toStringAsFixed(1)} mi', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  Text('\$${(miles * 0.67).toStringAsFixed(2)}', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ),
@@ -1682,6 +2166,59 @@ class _MileageScreenState extends State<MileageScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _MileageSummaryCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color color;
+
+  const _MileageSummaryCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha(30),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 4),
+          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        ],
+      ),
     );
   }
 }
@@ -1821,27 +2358,45 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: const CircleAvatar(child: Icon(Icons.receipt)),
-                                title: Text(clientName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text("${doc['description']} • ${doc['date']}"),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Row(
                                   children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primary.withAlpha(25),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(Icons.receipt_rounded, color: Theme.of(context).colorScheme.primary),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(clientName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                          const SizedBox(height: 4),
+                                          Text("${doc['description']} • ${doc['date']}", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
                                     Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         Text("${CurrencyService().currencySymbol}${doc['amount']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        _StatusBadge(status: doc['status']),
+                                        const SizedBox(height: 4),
+                                        _ModernStatusBadge(status: doc['status']),
                                       ],
                                     ),
                                     PopupMenuButton(
+                                      icon: Icon(Icons.more_vert_rounded, color: Colors.grey.shade600),
                                       itemBuilder: (context) => [
-                                        const PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf), SizedBox(width: 8), Text('Generate PDF')])),
-                                        const PopupMenuItem(value: 'status', child: Row(children: [Icon(Icons.edit), SizedBox(width: 8), Text('Change Status')])),
-                                        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_note), SizedBox(width: 8), Text('Edit')])),
-                                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                                        const PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf_rounded), SizedBox(width: 12), Text('Generate PDF')])),
+                                        const PopupMenuItem(value: 'status', child: Row(children: [Icon(Icons.edit_rounded), SizedBox(width: 12), Text('Change Status')])),
+                                        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_note_rounded), SizedBox(width: 12), Text('Edit')])),
+                                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_rounded, color: Colors.red), SizedBox(width: 12), Text('Delete', style: TextStyle(color: Colors.red))])),
                                       ],
                                       onSelected: (value) async {
                                         if (value == 'pdf') {
@@ -3069,11 +3624,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .ref()
           .child('users/$uid/logo.jpg');
       
-      if (kIsWeb) {
-        await ref.putData(await image.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
-      } else {
-        await ref.putFile(File(image.path));
-      }
+      // Use putData for both web and mobile (works universally)
+      await ref.putData(await image.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
 
       final url = await ref.getDownloadURL();
       
@@ -3379,15 +3931,42 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(48.0),
+        padding: const EdgeInsets.all(40.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon, 
+                size: 48, 
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title, 
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
-            Text(message, style: TextStyle(color: Colors.grey.shade500), textAlign: TextAlign.center),
+            Text(
+              message, 
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 15,
+                height: 1.5,
+              ), 
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -3401,79 +3980,148 @@ class MoreScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final menuItems = [
+      _MenuItemData(Icons.analytics_rounded, 'Analytics', Colors.purple, const AnalyticsScreen()),
+      _MenuItemData(Icons.attach_money_rounded, 'Expenses', Colors.red, const ExpensesScreen()),
+      _MenuItemData(Icons.people_rounded, 'Clients', Colors.orange, const ClientsScreen()),
+      _MenuItemData(Icons.calculate_rounded, 'Calculator', Colors.teal, const CalculatorScreen()),
+      _MenuItemData(Icons.settings_rounded, 'Settings', Colors.blueGrey, const SettingsScreen()),
+    ];
+
     return Scaffold(
-      body: GridView.count(
-        crossAxisCount: 2,
-        padding: const EdgeInsets.all(16),
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        children: [
-          _MenuCard(
-            icon: Icons.analytics, 
-            title: 'Analytics', 
-            color: Colors.purple,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Analytics')), body: const AnalyticsScreen()))),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'More',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Access all features',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.1,
+                  ),
+                  itemCount: menuItems.length,
+                  itemBuilder: (context, index) {
+                    final item = menuItems[index];
+                    return _ModernMenuCard(
+                      icon: item.icon,
+                      title: item.title,
+                      color: item.color,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => Scaffold(
+                            appBar: AppBar(
+                              title: Text(item.title),
+                              leading: IconButton(
+                                icon: const Icon(Icons.arrow_back_rounded),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ),
+                            body: item.screen,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-          _MenuCard(
-            icon: Icons.attach_money, 
-            title: 'Expenses', 
-            color: Colors.red,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Expenses')), body: const ExpensesScreen()))),
-          ),
-          _MenuCard(
-            icon: Icons.people, 
-            title: 'Clients', 
-            color: Colors.orange,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Clients')), body: const ClientsScreen()))),
-          ),
-          _MenuCard(
-            icon: Icons.calculate, 
-            title: 'Calculator', 
-            color: Colors.teal,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Fee Calculator')), body: const CalculatorScreen()))),
-          ),
-          _MenuCard(
-            icon: Icons.settings, 
-            title: 'Settings', 
-            color: Colors.grey,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Settings')), body: const SettingsScreen()))),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _MenuCard extends StatelessWidget {
+class _MenuItemData {
+  final IconData icon;
+  final String title;
+  final Color color;
+  final Widget screen;
+  
+  const _MenuItemData(this.icon, this.title, this.color, this.screen);
+}
+
+class _ModernMenuCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final Color color;
   final VoidCallback onTap;
 
-  const _MenuCard({required this.icon, required this.title, required this.color, required this.onTap});
+  const _ModernMenuCard({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
                 color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(icon, size: 32, color: color),
-            ),
-            const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color.withOpacity(0.8), color],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, size: 28, color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
