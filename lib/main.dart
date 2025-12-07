@@ -3872,7 +3872,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ],
                                 ),
                               ),
-                              if (isPremium) const PremiumBadge(),
+                              if (isPremium) PremiumBadge(),
                             ],
                           ),
                         );
