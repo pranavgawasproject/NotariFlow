@@ -31,7 +31,19 @@ const firebaseOptions = FirebaseOptions(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await CurrencyService().load();
+  
+  // Add error handler for uncaught errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('Flutter Error: ${details.exception}');
+    debugPrint('Stack trace: ${details.stack}');
+  };
+  
+  try {
+    await CurrencyService().load();
+  } catch (e) {
+    debugPrint('Currency service load error: $e');
+  }
+  
   try {
     await Firebase.initializeApp(options: firebaseOptions);
     // Enable offline persistence for rural areas
@@ -44,6 +56,7 @@ void main() async {
       debugPrint('Firebase fallback init error: $e2');
     }
   }
+  
   runApp(const NotaryFlowApp());
 }
 
@@ -1540,6 +1553,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ],
           ),
         );
+      },
+    );
       },
     );
   }
@@ -4077,7 +4092,7 @@ class _EmptyState extends StatelessWidget {
   final String title;
   final String message;
 
-  const _EmptyState({required this.icon, required this.title, required this.message});
+  const _EmptyState({super.key, required this.icon, required this.title, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -4215,6 +4230,7 @@ class _ModernMenuCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ModernMenuCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.color,
