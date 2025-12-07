@@ -56,7 +56,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching appointments: $e');
+      debugPrint('Error fetching appointments: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }

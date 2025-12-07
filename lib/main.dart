@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/journal_screen.dart';
 import 'utils/currency_service.dart';
 
@@ -34,7 +35,12 @@ void main() async {
     // Enable offline persistence for rural areas
     FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: true);
   } catch (e) {
-    await Firebase.initializeApp();
+    debugPrint('Firebase init error: $e');
+    try {
+      await Firebase.initializeApp();
+    } catch (e2) {
+      debugPrint('Firebase fallback init error: $e2');
+    }
   }
   runApp(const NotaryFlowApp());
 }
@@ -44,7 +50,7 @@ class NotaryFlowApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Modern Material 3 Color Scheme
+    // Modern Material 3 Color Scheme with dynamic colors
     final colorScheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFF4F46E5), // Indigo
       brightness: Brightness.light,
@@ -58,85 +64,63 @@ class NotaryFlowApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         
-        // Typography with proper sizing
-        textTheme: const TextTheme(
-          headlineLarge: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: -0.5),
-          headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-          titleLarge: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-          bodyLarge: TextStyle(fontSize: 16, height: 1.5),
-          bodyMedium: TextStyle(fontSize: 14, height: 1.5),
-          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        
-        // Card Theme - Modern elevated cards
+        // Card Theme - Modern Material 3 elevated cards with surface tint
         cardTheme: CardThemeData(
-          elevation: 0,
-          color: Colors.white,
-          surfaceTintColor: Colors.transparent,
+          elevation: 1,
+          shadowColor: Colors.black.withValues(alpha: 0.1),
+          surfaceTintColor: colorScheme.surfaceTint,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.grey.shade200, width: 1),
           ),
-          margin: EdgeInsets.zero,
+          margin: const EdgeInsets.all(8),
         ),
         
-        // Elevated Button - 48dp touch target minimum
+        // Elevated Button - Material 3 style with proper elevation
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            minimumSize: const Size(88, 52), // 52dp height for easy touch
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            elevation: 0,
-            backgroundColor: colorScheme.primary,
-            foregroundColor: Colors.white,
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            minimumSize: const Size(88, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            elevation: 1,
+            shadowColor: Colors.black.withValues(alpha: 0.15),
           ),
         ),
         
-        // Filled Button
+        // Filled Button - Material 3 prominent button
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            minimumSize: const Size(88, 52),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            minimumSize: const Size(88, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
         ),
         
-        // Outlined Button
+        // Outlined Button - Material 3 style
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size(88, 52),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            side: BorderSide(color: colorScheme.outline),
-            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            minimumSize: const Size(88, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
         ),
         
-        // Text Button
+        // Text Button - Material 3 style
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
             minimumSize: const Size(48, 48),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
         
-        // Input Decoration - Touch-friendly text fields
+        // Input Decoration - Material 3 filled text fields
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.grey.shade50,
+          fillColor: colorScheme.surfaceContainerHighest,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -144,82 +128,77 @@ class NotaryFlowApp extends StatelessWidget {
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.error),
+            borderSide: BorderSide(color: colorScheme.error, width: 1),
           ),
-          labelStyle: TextStyle(color: Colors.grey.shade700),
-          hintStyle: TextStyle(color: Colors.grey.shade500),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.error, width: 2),
+          ),
         ),
         
-        // List Tile - Proper touch target
-        listTileTheme: const ListTileThemeData(
+        // List Tile - Material 3 list items
+        listTileTheme: ListTileThemeData(
           minVerticalPadding: 12,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
         
-        // Bottom Navigation - Touch-friendly
+        // Bottom Navigation - Material 3 Navigation Bar
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           type: BottomNavigationBarType.fixed,
           selectedItemColor: colorScheme.primary,
-          unselectedItemColor: Colors.grey.shade500,
-          selectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontSize: 12),
-          elevation: 8,
-          backgroundColor: Colors.white,
+          unselectedItemColor: colorScheme.onSurfaceVariant,
+          elevation: 3,
+          backgroundColor: colorScheme.surface,
         ),
         
-        // Floating Action Button
+        // Floating Action Button - Material 3 FAB
         floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: Colors.white,
-          elevation: 4,
+          backgroundColor: colorScheme.primaryContainer,
+          foregroundColor: colorScheme.onPrimaryContainer,
+          elevation: 3,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         
-        // App Bar
+        // App Bar - Material 3 style
         appBarTheme: AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
+          backgroundColor: colorScheme.surface,
+          foregroundColor: colorScheme.onSurface,
           elevation: 0,
           centerTitle: false,
-          titleTextStyle: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          surfaceTintColor: colorScheme.surfaceTint,
         ),
         
-        // Divider
+        // Divider - Material 3 style
         dividerTheme: DividerThemeData(
-          color: Colors.grey.shade200,
+          color: colorScheme.outlineVariant,
           thickness: 1,
           space: 1,
         ),
         
-        // Chip Theme - Touch-friendly
+        // Chip Theme - Material 3 chips
         chipTheme: ChipThemeData(
-          labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          backgroundColor: colorScheme.surfaceContainerHighest,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         
-        // Dialog Theme
+        // Dialog Theme - Material 3 dialogs
         dialogTheme: DialogThemeData(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          titleTextStyle: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          backgroundColor: colorScheme.surface,
+          surfaceTintColor: colorScheme.surfaceTint,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          elevation: 6,
         ),
         
-        // Snackbar
+        // Snackbar - Material 3 style
         snackBarTheme: SnackBarThemeData(
           behavior: SnackBarBehavior.floating,
+          backgroundColor: colorScheme.inverseSurface,
+          contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          contentTextStyle: const TextStyle(fontSize: 14),
         ),
       ),
       home: const AuthWrapper(),
@@ -763,8 +742,8 @@ class _MainLayoutState extends State<MainLayout> {
                                 ),
                                 itemBuilder: (context) => <PopupMenuEntry<String>>[
                                   PopupMenuItem(
-                                    child: Text(email),
                                     enabled: false,
+                                    child: Text(email),
                                   ),
                                   const PopupMenuDivider(),
                                   PopupMenuItem(
@@ -800,7 +779,7 @@ class _MainLayoutState extends State<MainLayout> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 20,
                         offset: const Offset(0, -4),
                       ),
@@ -881,7 +860,7 @@ class _NavBarItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: isSelected 
             ? BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               )
             : null,
@@ -992,9 +971,9 @@ class DashboardScreen extends StatelessWidget {
                             crossAxisCount: crossAxisCount,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: isWide ? 1.5 : 1.3,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: isWide ? 1.6 : 1.1,
                             children: [
                               _ModernStatCard(
                                 title: "Revenue",
@@ -1063,7 +1042,6 @@ class DashboardScreen extends StatelessWidget {
                           icon: Icons.receipt_long_rounded,
                           title: "No invoices yet",
                           message: "Create your first invoice to start tracking your earnings!",
-                          actionLabel: "Create Invoice",
                         )
                       else
                         Card(
@@ -1112,7 +1090,7 @@ class _ModernStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: gradient,
@@ -1122,7 +1100,7 @@ class _ModernStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: gradient[0].withOpacity(0.3),
+            color: gradient[0].withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1130,35 +1108,43 @@ class _ModernStatCard extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           const Spacer(),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.white.withOpacity(0.9),
-              fontWeight: FontWeight.w500,
-            ),
           ),
         ],
       ),
@@ -1187,7 +1173,7 @@ class _ModernInvoiceListTile extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -1238,15 +1224,11 @@ class _EmptyStateCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
   
   const _EmptyStateCard({
     required this.icon,
     required this.title,
     required this.message,
-    this.actionLabel,
-    this.onAction,
   });
 
   @override
@@ -1261,13 +1243,13 @@ class _EmptyStateCard extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
                 size: 40,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
               ),
             ),
             const SizedBox(height: 20),
@@ -1284,14 +1266,6 @@ class _EmptyStateCard extends StatelessWidget {
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               textAlign: TextAlign.center,
             ),
-            if (actionLabel != null) ...[
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: onAction,
-                icon: const Icon(Icons.add_rounded),
-                label: Text(actionLabel!),
-              ),
-            ],
           ],
         ),
       ),
@@ -1413,7 +1387,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 children: [
                   _AnalyticsCard(
                     title: "Total Revenue",
-                    value: "${CurrencyService().currencySymbol}${monthlyRevenue.values.fold(0.0, (sum, val) => sum + val).toStringAsFixed(0)}",
+                    value: "${CurrencyService().currencySymbol}${monthlyRevenue.values.fold(0.0, (total, val) => total + val).toStringAsFixed(0)}",
                     icon: Icons.trending_up,
                     color: Colors.green,
                   ),
@@ -1611,8 +1585,8 @@ class _AnalyticsCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3), width: 2),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))],
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1622,7 +1596,7 @@ class _AnalyticsCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: color, size: 20),
@@ -1636,30 +1610,6 @@ class _AnalyticsCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LegendItem({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 16,
-          height: 16,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      ],
     );
   }
 }
@@ -1750,7 +1700,6 @@ class _MileageScreenState extends State<MileageScreen> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: () async {
-                  final query = Uri.encodeComponent('${_sourceCtrl.text} to ${_destinationCtrl.text}');
                   final url = 'https://www.google.com/maps/dir/?api=1&origin=${Uri.encodeComponent(_sourceCtrl.text)}&destination=${Uri.encodeComponent(_destinationCtrl.text)}';
                   if (kIsWeb) {
                     html.window.open(url, '_blank');
@@ -2025,7 +1974,7 @@ class _MileageScreenState extends State<MileageScreen> {
                           
                           // Purpose Dropdown
                           DropdownButtonFormField<String>(
-                            value: _purposeCtrl.text.isEmpty ? null : _purposeCtrl.text,
+                            initialValue: _purposeCtrl.text.isEmpty ? null : _purposeCtrl.text,
                             decoration: const InputDecoration(
                               labelText: "Purpose",
                               prefixIcon: Icon(Icons.work),
@@ -2250,7 +2199,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     String csv = const ListToCsvConverter().convert(rows);
     final bytes = html.Blob([csv], 'text/csv');
     final url = html.Url.createObjectUrlFromBlob(bytes);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute('download', 'invoices_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv')
       ..click();
     html.Url.revokeObjectUrl(url);
@@ -2507,7 +2456,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final bytes = await pdf.save();
     final blob = html.Blob([bytes], 'application/pdf');
     final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute('download', 'invoice_${invoice['date']}_$clientName.pdf')
       ..click();
     html.Url.revokeObjectUrl(url);
@@ -2770,6 +2719,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _addExpense() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isSaving) return;
 
     setState(() => _isSaving = true);
 
@@ -2943,7 +2893,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
     String csv = const ListToCsvConverter().convert(rows);
     final bytes = html.Blob([csv], 'text/csv');
     final url = html.Url.createObjectUrlFromBlob(bytes);
-    final anchor = html.AnchorElement(href: url)
+    html.AnchorElement(href: url)
       ..setAttribute('download', 'clients_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.csv')
       ..click();
     html.Url.revokeObjectUrl(url);
@@ -3500,7 +3450,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.indigo.withOpacity(0.3),
+                          color: Colors.indigo.withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -3802,7 +3752,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: Colors.amber.shade200),
                         boxShadow: [
-                          BoxShadow(color: Colors.amber.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                          BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4)),
                         ],
                       ),
                       child: Column(
@@ -3939,13 +3889,13 @@ class _EmptyState extends StatelessWidget {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon, 
                 size: 48, 
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(height: 24),
@@ -4083,7 +4033,7 @@ class _ModernMenuCard extends StatelessWidget {
             border: Border.all(color: Colors.grey.shade200),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -4097,14 +4047,14 @@ class _ModernMenuCard extends StatelessWidget {
                 height: 60,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [color.withOpacity(0.8), color],
+                    colors: [color.withValues(alpha: 0.8), color],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withOpacity(0.3),
+                      color: color.withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
