@@ -16,6 +16,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/journal_screen.dart';
 import 'utils/currency_service.dart';
+import 'utils/subscription_service.dart';
+import 'widgets/premium_widgets.dart';
 
 // --- CONFIGURATION ---
 const firebaseOptions = FirebaseOptions(
@@ -1326,13 +1328,31 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return FutureBuilder<bool>(
+      future: SubscriptionService().isPremium(),
+      builder: (context, premiumSnapshot) {
+        final isPremium = premiumSnapshot.data ?? false;
+        
+        if (!isPremium) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: PremiumFeatureLock(
+                featureName: 'Advanced Analytics',
+                icon: Icons.analytics_rounded,
+                description: 'Get detailed insights, charts, profit/loss reports, and revenue trends with Premium',
+              ),
+            ),
+          );
+        }
 
-    return StreamBuilder(
-      stream: FirebaseFirestore.instance
-          .collection('artifacts/notaryflow-v2/users/$uid/invoices')
-          .orderBy('date')
-          .snapshots(),
+        final uid = FirebaseAuth.instance.currentUser!.uid;
+
+        return StreamBuilder(
+          stream: FirebaseFirestore.instance
+              .collection('artifacts/notaryflow-v2/users/$uid/invoices')
+              .orderBy('date')
+              .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -1646,6 +1666,15 @@ class _MileageScreenState extends State<MileageScreen> {
     'Other',
   ];
 
+  Future<void> _checkLimitAndShowForm() async {
+    final limitCheck = await SubscriptionService().checkMileageLimit();
+    if (!limitCheck['canAdd']) {
+      if (mounted) SubscriptionService.showPremiumDialog(context, 'Unlimited Mileage');
+      return;
+    }
+    setState(() => _showForm = true);
+  }
+
   @override
   void dispose() {
     _sourceCtrl.dispose();
@@ -1829,6 +1858,20 @@ class _MileageScreenState extends State<MileageScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              // --- PREMIUM BANNER ---
+              FutureBuilder<Map<String, dynamic>>(
+                future: SubscriptionService().checkMileageLimit(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data!['isPremium'] == false) {
+                    return PremiumBanner(
+                      feature: 'mileage trips',
+                      currentCount: snapshot.data!['count'] ?? 0,
+                      limit: snapshot.data!['limit'] ?? 20,
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
               // --- SUMMARY CARDS ---
               Row(
                 children: [
@@ -1859,7 +1902,7 @@ class _MileageScreenState extends State<MileageScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => setState(() => _showForm = true),
+                    onPressed: _checkLimitAndShowForm,
                     icon: const Icon(Icons.add),
                     label: const Text('Log New Trip'),
                     style: ElevatedButton.styleFrom(
@@ -2250,6 +2293,27 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
             return Column(
               children: [
+                // --- PREMIUM BANNER ---
+                FutureBuilder<bool>(
+                  future: SubscriptionService().isPremium(),
+                  builder: (context, premiumSnapshot) {
+                    final isPremium = premiumSnapshot.data ?? false;
+                    if (isPremium) return const SizedBox.shrink();
+                    
+                    return FutureBuilder<Map<String, dynamic>>(
+                      future: SubscriptionService().checkInvoiceLimit(),
+                      builder: (context, limitSnapshot) {
+                        if (!limitSnapshot.hasData) return const SizedBox.shrink();
+                        final data = limitSnapshot.data!;
+                        return PremiumBanner(
+                          feature: 'invoices',
+                          currentCount: data['count'] ?? 0,
+                          limit: data['limit'] ?? 10,
+                        );
+                      },
+                    );
+                  },
+                ),
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
@@ -2278,13 +2342,41 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton.filled(
-                        onPressed: invoices.isEmpty ? null : () => _exportCSV(invoices),
+                        onPressed: invoices.isEmpty 
+                            ? null 
+                            : () async {
+                                final isPremium = await SubscriptionService().isPremium();
+                                if (!isPremium) {
+                                  if (context.mounted) SubscriptionService.showPremiumDialog(context, 'Export to CSV');
+                                  return;
+                                }
+                                _exportCSV(invoices);
+                              },
                         icon: const Icon(Icons.file_download),
                         tooltip: 'Export CSV',
                       ),
                       const SizedBox(width: 8),
                       FilledButton.icon(
-                        onPressed: () => _showInvoiceDialog(context, null, clientMap),
+                        onPressed: () async {
+                          final limitCheck = await SubscriptionService().checkInvoiceLimit();
+                          if (!limitCheck['canAdd']) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(limitCheck['message']),
+                                  backgroundColor: Colors.orange,
+                                  action: SnackBarAction(
+                                    label: 'Upgrade',
+                                    textColor: Colors.white,
+                                    onPressed: () => SubscriptionService.showPremiumDialog(context, 'Unlimited Invoices'),
+                                  ),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          if (context.mounted) _showInvoiceDialog(context, null, clientMap);
+                        },
                         icon: const Icon(Icons.add),
                         label: const Text("Add Invoice"),
                       ),
@@ -2816,53 +2908,79 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddDialog,
+        onPressed: () async {
+          final limitCheck = await SubscriptionService().checkExpenseLimit();
+          if (!limitCheck['canAdd']) {
+            if (context.mounted) SubscriptionService.showPremiumDialog(context, 'Unlimited Expenses');
+            return;
+          }
+          _showAddDialog();
+        },
         child: const Icon(Icons.add),
       ),
-      body: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('artifacts/notaryflow-v2/users/$uid/expenses')
-            .orderBy('date', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-          final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) {
-            return _EmptyState(
-              icon: Icons.money_off,
-              title: "No expenses",
-              message: "Track your business spending here",
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              return Card(
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.red.shade50,
-                    child: const Icon(Icons.attach_money, color: Colors.red),
-                  ),
-                  title: Text(doc['description']),
-                  subtitle: Text('${doc['category']} • ${doc['date']}'),
-                  trailing: Text(
-                    '-${CurrencyService().currencySymbol}${doc['amount']}',
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  onLongPress: () async {
-                    // Simple delete on long press
-                    await doc.reference.delete();
-                  },
-                ),
-              );
+      body: Column(
+        children: [
+          FutureBuilder<Map<String, dynamic>>(
+            future: SubscriptionService().checkExpenseLimit(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!['isPremium'] == false) {
+                return PremiumBanner(
+                  feature: 'expenses',
+                  currentCount: snapshot.data!['count'] ?? 0,
+                  limit: snapshot.data!['limit'] ?? 20,
+                );
+              }
+              return const SizedBox.shrink();
             },
-          );
-        },
+          ),
+          Expanded(
+            child: StreamBuilder(
+              stream: FirebaseFirestore.instance
+                  .collection('artifacts/notaryflow-v2/users/$uid/expenses')
+                  .orderBy('date', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+                final docs = snapshot.data!.docs;
+
+                if (docs.isEmpty) {
+                  return _EmptyState(
+                    icon: Icons.money_off,
+                    title: "No expenses",
+                    message: "Track your business spending here",
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = docs[index];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.red.shade50,
+                          child: const Icon(Icons.attach_money, color: Colors.red),
+                        ),
+                        title: Text(doc['description']),
+                        subtitle: Text('${doc['category']} • ${doc['date']}'),
+                        trailing: Text(
+                          '-${CurrencyService().currencySymbol}${doc['amount']}',
+                          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        onLongPress: () async {
+                          // Simple delete on long press
+                          await doc.reference.delete();
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2935,6 +3053,19 @@ class _ClientsScreenState extends State<ClientsScreen> {
 
         return Column(
           children: [
+            FutureBuilder<Map<String, dynamic>>(
+              future: SubscriptionService().checkClientLimit(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData && snapshot.data!['isPremium'] == false) {
+                  return PremiumBanner(
+                    feature: 'clients',
+                    currentCount: snapshot.data!['count'] ?? 0,
+                    limit: snapshot.data!['limit'] ?? 5,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -2963,13 +3094,41 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: clients.isEmpty ? null : () => _exportCSV(clients),
+                    onPressed: clients.isEmpty 
+                        ? null 
+                        : () async {
+                            final isPremium = await SubscriptionService().isPremium();
+                            if (!isPremium) {
+                              if (context.mounted) SubscriptionService.showPremiumDialog(context, 'Export to CSV');
+                              return;
+                            }
+                            _exportCSV(clients);
+                          },
                     icon: const Icon(Icons.file_download),
                     tooltip: 'Export CSV',
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    onPressed: () => _showClientDialog(context, null),
+                    onPressed: () async {
+                      final limitCheck = await SubscriptionService().checkClientLimit();
+                      if (!limitCheck['canAdd']) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(limitCheck['message']),
+                              backgroundColor: Colors.orange,
+                              action: SnackBarAction(
+                                label: 'Upgrade',
+                                textColor: Colors.white,
+                                onPressed: () => SubscriptionService.showPremiumDialog(context, 'Unlimited Clients'),
+                              ),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      if (context.mounted) _showClientDialog(context, null);
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text("Add Client"),
                   ),
@@ -3661,6 +3820,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     const Text("Business Profile", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
+
+                    // --- SUBSCRIPTION STATUS ---
+                    FutureBuilder<bool>(
+                      future: SubscriptionService().isPremium(),
+                      builder: (context, snapshot) {
+                        final isPremium = snapshot.data ?? false;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 24),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isPremium ? Colors.amber.shade50 : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isPremium ? Colors.amber.shade200 : Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isPremium ? Icons.star : Icons.star_border,
+                                color: isPremium ? Colors.amber : Colors.grey,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isPremium ? 'Premium Member' : 'Free Plan',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      isPremium ? 'Unlimited Access' : 'Limited Features',
+                                      style: TextStyle(color: Colors.grey.shade700),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isPremium) const PremiumBadge(),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     
                     // --- LOGO UPLOAD ---
                     Center(
