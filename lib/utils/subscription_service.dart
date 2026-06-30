@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Subscription service for managing premium features and limits
 class SubscriptionService {
@@ -9,6 +9,12 @@ class SubscriptionService {
   static const int freeMileageLimit = 20;
   static const int freeExpenseLimit = 30;
   static const int freeClientLimit = 15;
+
+  // LemonSqueezy checkout URLs
+  static const String monthlyCheckoutUrl = 
+      'https://notariflow.lemonsqueezy.com/buy/74996c57-0a9e-4890-b424-86bd3aac606d';
+  static const String yearlyCheckoutUrl = 
+      'https://notariflow.lemonsqueezy.com/buy/101bec89-b835-4862-a493-526855bde384';
 
   // Developer emails that get automatic premium access (for testing)
   static const List<String> _developerEmails = [
@@ -185,6 +191,9 @@ class SubscriptionService {
 
   /// Show premium upgrade dialog
   static void showPremiumDialog(BuildContext context, String feature) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userEmail = user?.email ?? '';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -209,6 +218,13 @@ class SubscriptionService {
             _buildFeatureItem('Advanced analytics & reports'),
             _buildFeatureItem('CSV export functionality'),
             _buildFeatureItem('Priority support'),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 12),
+            const Text(
+              'Choose your plan:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ],
         ),
         actions: [
@@ -216,20 +232,49 @@ class SubscriptionService {
             onPressed: () => Navigator.pop(context),
             child: const Text('Maybe Later'),
           ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchCheckout(monthlyCheckoutUrl, userEmail);
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.amber.shade700,
+              side: BorderSide(color: Colors.amber.shade600),
+            ),
+            child: const Text('Monthly'),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // TODO: Implement upgrade flow
+              _launchCheckout(yearlyCheckoutUrl, userEmail);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.amber.shade600,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Upgrade Now'),
+            child: const Text('Yearly (Save 20%)'),
           ),
         ],
       ),
     );
+  }
+
+  /// Launch LemonSqueezy checkout with user email prefilled
+  static Future<void> _launchCheckout(String baseUrl, String email) async {
+    // Add email as checkout prefill parameter
+    final checkoutUrl = email.isNotEmpty 
+        ? '$baseUrl?checkout[email]=$email'
+        : baseUrl;
+    
+    final uri = Uri.parse(checkoutUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  /// Open subscription management / upgrade page
+  static void showUpgradePage(BuildContext context) {
+    showPremiumDialog(context, 'all premium features');
   }
 
   static Widget _buildFeatureItem(String text) {
