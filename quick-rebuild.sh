@@ -8,10 +8,15 @@ echo "=================================="
 echo ""
 
 # Navigate to project directory
-cd /workspaces/NotariFlow || exit 1
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+cd "$SCRIPT_DIR" || exit 1
 
 # Add Flutter to PATH
-export PATH="$PATH:/workspaces/flutter/bin"
+if [ -d "/workspaces/flutter/bin" ]; then
+    export PATH="$PATH:/workspaces/flutter/bin"
+elif [ -d "/home/ubuntu/flutter/bin" ]; then
+    export PATH="$PATH:/home/ubuntu/flutter/bin"
+fi
 
 # Check if Flutter is available
 if ! command -v flutter &> /dev/null; then
