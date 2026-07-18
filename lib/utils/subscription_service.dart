@@ -19,6 +19,7 @@ class SubscriptionService {
   // Developer emails that get automatic premium access (for testing)
   static const List<String> _developerEmails = [
     'pranavgawas@gmail.com',
+    'pranavgawas.project@gmail.com',
     // Add more developer emails here as needed
   ];
 
