@@ -84,7 +84,7 @@ class _JournalScreenState extends State<JournalScreen> {
                           const SizedBox(height: 16),
                           const Text('Signature:', style: TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
-                          if (data['signatureBytes'] != null)
+                          if (data['signatureBytes'] != null && data['signatureBytes'] is List && (data['signatureBytes'] as List).isNotEmpty)
                             Container(
                               height: 100,
                               color: Colors.grey[100],
@@ -302,7 +302,12 @@ class _NewJournalEntryScreenState extends State<NewJournalEntryScreen> {
                 controller: _feeCtrl,
                 decoration: InputDecoration(labelText: 'Fee Charged (${CurrencyService().currencySymbol})', border: const OutlineInputBorder()),
                 keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  final fee = double.tryParse(v.trim());
+                  if (fee == null || fee < 0) return 'Enter a valid fee';
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
               const Text('Signer Signature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),

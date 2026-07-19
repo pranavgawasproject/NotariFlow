@@ -38,8 +38,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        final dateStr = data['date'] as String;
-        final date = DateTime.parse(dateStr);
+        final dateStr = data['date'] as String?;
+        if (dateStr == null) continue;
+        final date = DateTime.tryParse(dateStr);
+        if (date == null) continue;
         // Normalize date to remove time for map key
         final dateKey = DateTime(date.year, date.month, date.day);
 

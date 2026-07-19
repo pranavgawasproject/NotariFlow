@@ -70,13 +70,13 @@ class SubscriptionService {
   Future<Map<String, dynamic>> checkMileageLimit() async {
     final premium = await isPremium();
     if (premium) {
-      return {'allowed': true, 'isPremium': true, 'count': 0, 'limit': -1};
+      return {'allowed': true, 'canAdd': true, 'isPremium': true, 'count': 0, 'limit': -1, 'message': ''};
     }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        return {'allowed': false, 'isPremium': false, 'count': 0, 'limit': freeMileageLimit};
+        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': freeMileageLimit, 'message': 'User not authenticated'};
       }
 
       final snapshot = await FirebaseFirestore.instance
@@ -85,15 +85,18 @@ class SubscriptionService {
           .get();
 
       final count = snapshot.count ?? 0;
+      final allowed = count < freeMileageLimit;
       return {
-        'allowed': count < freeMileageLimit,
+        'allowed': allowed,
+        'canAdd': allowed,
         'isPremium': false,
         'count': count,
         'limit': freeMileageLimit,
+        'message': allowed ? '' : 'Free plan limit of $freeMileageLimit mileage entries reached. Upgrade for unlimited logs.',
       };
     } catch (e) {
       debugPrint('Error checking mileage limit: $e');
-      return {'allowed': true, 'isPremium': false, 'count': 0, 'limit': freeMileageLimit};
+      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': freeMileageLimit, 'message': ''};
     }
   }
 
@@ -101,13 +104,13 @@ class SubscriptionService {
   Future<Map<String, dynamic>> checkInvoiceLimit() async {
     final premium = await isPremium();
     if (premium) {
-      return {'allowed': true, 'isPremium': true, 'count': 0, 'limit': -1};
+      return {'allowed': true, 'canAdd': true, 'isPremium': true, 'count': 0, 'limit': -1, 'message': ''};
     }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        return {'allowed': false, 'isPremium': false, 'count': 0, 'limit': freeInvoiceLimit};
+        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': freeInvoiceLimit, 'message': 'User not authenticated'};
       }
 
       final snapshot = await FirebaseFirestore.instance
@@ -116,15 +119,18 @@ class SubscriptionService {
           .get();
 
       final count = snapshot.count ?? 0;
+      final allowed = count < freeInvoiceLimit;
       return {
-        'allowed': count < freeInvoiceLimit,
+        'allowed': allowed,
+        'canAdd': allowed,
         'isPremium': false,
         'count': count,
         'limit': freeInvoiceLimit,
+        'message': allowed ? '' : 'Free plan limit of $freeInvoiceLimit invoices reached. Upgrade for unlimited invoices.',
       };
     } catch (e) {
       debugPrint('Error checking invoice limit: $e');
-      return {'allowed': true, 'isPremium': false, 'count': 0, 'limit': freeInvoiceLimit};
+      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': freeInvoiceLimit, 'message': ''};
     }
   }
 
@@ -132,13 +138,13 @@ class SubscriptionService {
   Future<Map<String, dynamic>> checkExpenseLimit() async {
     final premium = await isPremium();
     if (premium) {
-      return {'allowed': true, 'isPremium': true, 'count': 0, 'limit': -1};
+      return {'allowed': true, 'canAdd': true, 'isPremium': true, 'count': 0, 'limit': -1, 'message': ''};
     }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        return {'allowed': false, 'isPremium': false, 'count': 0, 'limit': freeExpenseLimit};
+        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': freeExpenseLimit, 'message': 'User not authenticated'};
       }
 
       final snapshot = await FirebaseFirestore.instance
@@ -147,15 +153,18 @@ class SubscriptionService {
           .get();
 
       final count = snapshot.count ?? 0;
+      final allowed = count < freeExpenseLimit;
       return {
-        'allowed': count < freeExpenseLimit,
+        'allowed': allowed,
+        'canAdd': allowed,
         'isPremium': false,
         'count': count,
         'limit': freeExpenseLimit,
+        'message': allowed ? '' : 'Free plan limit of $freeExpenseLimit expenses reached. Upgrade for unlimited expenses.',
       };
     } catch (e) {
       debugPrint('Error checking expense limit: $e');
-      return {'allowed': true, 'isPremium': false, 'count': 0, 'limit': freeExpenseLimit};
+      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': freeExpenseLimit, 'message': ''};
     }
   }
 
@@ -163,13 +172,13 @@ class SubscriptionService {
   Future<Map<String, dynamic>> checkClientLimit() async {
     final premium = await isPremium();
     if (premium) {
-      return {'allowed': true, 'isPremium': true, 'count': 0, 'limit': -1};
+      return {'allowed': true, 'canAdd': true, 'isPremium': true, 'count': 0, 'limit': -1, 'message': ''};
     }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        return {'allowed': false, 'isPremium': false, 'count': 0, 'limit': freeClientLimit};
+        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': freeClientLimit, 'message': 'User not authenticated'};
       }
 
       final snapshot = await FirebaseFirestore.instance
@@ -178,15 +187,18 @@ class SubscriptionService {
           .get();
 
       final count = snapshot.count ?? 0;
+      final allowed = count < freeClientLimit;
       return {
-        'allowed': count < freeClientLimit,
+        'allowed': allowed,
+        'canAdd': allowed,
         'isPremium': false,
         'count': count,
         'limit': freeClientLimit,
+        'message': allowed ? '' : 'Free plan limit of $freeClientLimit clients reached. Upgrade for unlimited clients.',
       };
     } catch (e) {
       debugPrint('Error checking client limit: $e');
-      return {'allowed': true, 'isPremium': false, 'count': 0, 'limit': freeClientLimit};
+      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': freeClientLimit, 'message': ''};
     }
   }
 

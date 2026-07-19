@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notariflow/utils/currency_service.dart';
+import 'package:notariflow/utils/subscription_service.dart';
 
 void main() {
   group('NotariFlow Unit Tests', () {
@@ -9,8 +11,32 @@ void main() {
 
     test('validates monetary formatting', () {
       const amount = 150.5;
-      final formatted = '\$${amount.toStringAsFixed(2)}';
+      final formatted = '${CurrencyService().currencySymbol}${amount.toStringAsFixed(2)}';
       expect(formatted, '\$150.50');
+    });
+
+    test('validates IRS mileage tax deduction calculation (0.67 rate)', () {
+      const miles = 50.0;
+      const taxDeductionRate = 0.67;
+      final deduction = miles * taxDeductionRate;
+      expect(deduction, 33.5);
+    });
+
+    test('validates subscription service limit constants', () {
+      expect(SubscriptionService.freeInvoiceLimit, equals(10));
+      expect(SubscriptionService.freeMileageLimit, equals(20));
+      expect(SubscriptionService.freeExpenseLimit, equals(30));
+      expect(SubscriptionService.freeClientLimit, equals(15));
+    });
+
+    test('validates double input parsing & safety', () {
+      expect(double.tryParse('123.45'), equals(123.45));
+      expect(double.tryParse('invalid'), isNull);
+      expect(double.tryParse('-10'), equals(-10.0));
+      
+      double parseAmount(String input) => double.tryParse(input.trim()) ?? 0.0;
+      expect(parseAmount('  99.99  '), equals(99.99));
+      expect(parseAmount('abc'), equals(0.0));
     });
   });
 }

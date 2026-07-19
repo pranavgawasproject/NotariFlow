@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -1507,7 +1508,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         gridData: FlGridData(
                           show: true,
                           drawVerticalLine: false,
-                          horizontalInterval: (revenueData.isEmpty ? 100 : revenueData.reduce((a, b) => a > b ? a : b)) / 4,
+                          horizontalInterval: (() {
+                            final maxRev = revenueData.isEmpty ? 100.0 : revenueData.reduce((a, b) => a > b ? a : b);
+                            return maxRev > 0 ? maxRev / 4 : 25.0;
+                          })(),
                           getDrawingHorizontalLine: (value) {
                             return FlLine(
                               color: Colors.grey.shade200,
@@ -1683,7 +1687,8 @@ class _MileageScreenState extends State<MileageScreen> {
 
   Future<void> _checkLimitAndShowForm() async {
     final limitCheck = await SubscriptionService().checkMileageLimit();
-    if (!limitCheck['canAdd']) {
+    final canAdd = (limitCheck['canAdd'] ?? limitCheck['allowed'] ?? true) == true;
+    if (!canAdd) {
       if (mounted) SubscriptionService.showPremiumDialog(context, 'Unlimited Mileage');
       return;
     }
@@ -1786,7 +1791,7 @@ class _MileageScreenState extends State<MileageScreen> {
 
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      final miles = double.parse(_milesCtrl.text);
+      final miles = double.tryParse(_milesCtrl.text.trim()) ?? 0.0;
       
       await FirebaseFirestore.instance
           .collection('artifacts/notaryflow-v2/users/$uid/trips')
@@ -2374,11 +2379,15 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                       FilledButton.icon(
                         onPressed: () async {
                           final limitCheck = await SubscriptionService().checkInvoiceLimit();
-                          if (!limitCheck['canAdd']) {
+                          final canAdd = (limitCheck['canAdd'] ?? limitCheck['allowed'] ?? true) == true;
+                          if (!canAdd) {
                             if (context.mounted) {
+                              final message = (limitCheck['message'] as String?)?.isNotEmpty == true
+                                  ? limitCheck['message'] as String
+                                  : 'Invoice limit reached.';
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(limitCheck['message']),
+                                  content: Text(message),
                                   backgroundColor: Colors.orange,
                                   action: SnackBarAction(
                                     label: 'Upgrade',
@@ -2561,12 +2570,18 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     );
 
     final bytes = await pdf.save();
-    final blob = html.Blob([bytes], 'application/pdf');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', 'invoice_${invoice['date']}_$clientName.pdf')
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    final fileName = 'invoice_${invoice['date']}_$clientName.pdf';
+
+    if (kIsWeb) {
+      final blob = html.Blob([bytes], 'application/pdf');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', fileName)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } else {
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2836,7 +2851,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           .collection('artifacts/notaryflow-v2/users/$uid/expenses')
           .add({
         'description': _descCtrl.text.trim(),
-        'amount': double.parse(_amountCtrl.text),
+        'amount': double.tryParse(_amountCtrl.text.trim()) ?? 0.0,
         'category': _categoryCtrl.text.trim(),
         'date': DateFormat('yyyy-MM-dd').format(_selectedDate),
         'timestamp': FieldValue.serverTimestamp(),
@@ -2877,14 +2892,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               TextFormField(
                 controller: _descCtrl,
                 decoration: const InputDecoration(labelText: 'Description (e.g. Toner)', border: OutlineInputBorder()),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _amountCtrl,
                 decoration: InputDecoration(labelText: 'Amount', prefixText: CurrencyService().currencySymbol, border: const OutlineInputBorder()),
                 keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  final amount = double.tryParse(v.trim());
+                  if (amount == null || amount <= 0) return 'Enter a valid amount';
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -2925,7 +2945,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final limitCheck = await SubscriptionService().checkExpenseLimit();
-          if (!limitCheck['canAdd']) {
+          final canAdd = (limitCheck['canAdd'] ?? limitCheck['allowed'] ?? true) == true;
+          if (!canAdd) {
             if (context.mounted) SubscriptionService.showPremiumDialog(context, 'Unlimited Expenses');
             return;
           }
@@ -3126,11 +3147,15 @@ class _ClientsScreenState extends State<ClientsScreen> {
                   FilledButton.icon(
                     onPressed: () async {
                       final limitCheck = await SubscriptionService().checkClientLimit();
-                      if (!limitCheck['canAdd']) {
+                      final canAdd = (limitCheck['canAdd'] ?? limitCheck['allowed'] ?? true) == true;
+                      if (!canAdd) {
                         if (context.mounted) {
+                          final message = (limitCheck['message'] as String?)?.isNotEmpty == true
+                              ? limitCheck['message'] as String
+                              : 'Client limit reached.';
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(limitCheck['message']),
+                              content: Text(message),
                               backgroundColor: Colors.orange,
                               action: SnackBarAction(
                                 label: 'Upgrade',
