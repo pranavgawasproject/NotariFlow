@@ -213,7 +213,7 @@ class SubscriptionService {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': 15, 'message': 'User not authenticated'};
+        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': freeSignatureLimit, 'message': 'User not authenticated'};
       }
 
       final snapshot = await FirebaseFirestore.instance
@@ -222,20 +222,21 @@ class SubscriptionService {
           .get();
 
       final count = snapshot.count ?? 0;
-      final allowed = count < 15;
+      final allowed = count < freeSignatureLimit;
       return {
         'allowed': allowed,
         'canAdd': allowed,
         'isPremium': false,
         'count': count,
-        'limit': 15,
-        'message': allowed ? '' : 'Free plan limit of 15 digital signatures reached. Upgrade for unlimited signatures.',
+        'limit': freeSignatureLimit,
+        'message': allowed ? '' : 'Free plan limit of $freeSignatureLimit digital signatures reached. Upgrade for unlimited signatures.',
       };
     } catch (e) {
       debugPrint('Error checking signature limit: $e');
-      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': 15, 'message': ''};
+      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': freeSignatureLimit, 'message': ''};
     }
   }
+
 
   /// Show premium upgrade dialog
   static void showPremiumDialog(BuildContext context, String feature) {
