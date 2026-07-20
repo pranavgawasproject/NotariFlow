@@ -9,6 +9,7 @@ class SubscriptionService {
   static const int freeMileageLimit = 20;
   static const int freeExpenseLimit = 30;
   static const int freeClientLimit = 15;
+  static const int freeSignatureLimit = 15;
 
   // LemonSqueezy checkout URLs
   static const String monthlyCheckoutUrl = 

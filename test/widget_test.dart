@@ -27,6 +27,7 @@ void main() {
       expect(SubscriptionService.freeMileageLimit, equals(20));
       expect(SubscriptionService.freeExpenseLimit, equals(30));
       expect(SubscriptionService.freeClientLimit, equals(15));
+      expect(SubscriptionService.freeSignatureLimit, equals(15));
     });
 
     test('validates double input parsing & safety', () {
