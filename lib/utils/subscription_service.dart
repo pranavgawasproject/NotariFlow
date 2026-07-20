@@ -237,6 +237,21 @@ class SubscriptionService {
     }
   }
 
+  /// Calculate usage percentage (0-100) towards free limit for UI progress bars
+  static Map<String, dynamic> calculatePlanUsagePercentage(int currentCount, int maxLimit) {
+    if (maxLimit <= 0) {
+      return {'percentage': 0, 'isNearLimit': false, 'isLimitReached': false};
+    }
+    final count = currentCount < 0 ? 0 : currentCount;
+    final pct = ((count / maxLimit) * 100).round().clamp(0, 100);
+    return {
+      'percentage': pct,
+      'isNearLimit': pct >= 80 && pct < 100,
+      'isLimitReached': pct >= 100,
+    };
+  }
+
+
 
   /// Show premium upgrade dialog
   static void showPremiumDialog(BuildContext context, String feature) {
