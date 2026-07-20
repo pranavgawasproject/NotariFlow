@@ -202,6 +202,40 @@ class SubscriptionService {
     }
   }
 
+  /// Check signature log limit for free users
+  Future<Map<String, dynamic>> checkSignatureLimit() async {
+    final premium = await isPremium();
+    if (premium) {
+      return {'allowed': true, 'canAdd': true, 'isPremium': true, 'count': 0, 'limit': -1, 'message': ''};
+    }
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        return {'allowed': false, 'canAdd': false, 'isPremium': false, 'count': 0, 'limit': 15, 'message': 'User not authenticated'};
+      }
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('artifacts/notaryflow-v2/users/${user.uid}/signatures')
+          .count()
+          .get();
+
+      final count = snapshot.count ?? 0;
+      final allowed = count < 15;
+      return {
+        'allowed': allowed,
+        'canAdd': allowed,
+        'isPremium': false,
+        'count': count,
+        'limit': 15,
+        'message': allowed ? '' : 'Free plan limit of 15 digital signatures reached. Upgrade for unlimited signatures.',
+      };
+    } catch (e) {
+      debugPrint('Error checking signature limit: $e');
+      return {'allowed': true, 'canAdd': true, 'isPremium': false, 'count': 0, 'limit': 15, 'message': ''};
+    }
+  }
+
   /// Show premium upgrade dialog
   static void showPremiumDialog(BuildContext context, String feature) {
     final user = FirebaseAuth.instance.currentUser;
