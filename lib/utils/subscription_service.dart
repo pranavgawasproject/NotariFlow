@@ -251,6 +251,31 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate estimated fee for notarization service including travel mileage
+  static Map<String, dynamic> calculateNotaryFeeEstimate({
+    int signaturesCount = 1,
+    double travelMiles = 0.0,
+    double feePerSignature = 10.0,
+    double mileageRate = 0.67,
+  }) {
+    final sigs = signaturesCount <= 0 ? 1 : signaturesCount;
+    final miles = travelMiles < 0 ? 0.0 : travelMiles;
+    final sigFee = feePerSignature < 0 ? 10.0 : feePerSignature;
+    final rate = mileageRate < 0 ? 0.67 : mileageRate;
+
+    final signatureTotal = sigs * sigFee;
+    final travelTotal = miles * rate;
+    final totalEstimate = signatureTotal + travelTotal;
+
+    return {
+      'signaturesCount': sigs,
+      'signatureTotal': double.parse(signatureTotal.toStringAsFixed(2)),
+      'travelMiles': double.parse(miles.toStringAsFixed(2)),
+      'travelTotal': double.parse(travelTotal.toStringAsFixed(2)),
+      'totalEstimate': double.parse(totalEstimate.toStringAsFixed(2)),
+    };
+  }
+
 
 
   /// Show premium upgrade dialog

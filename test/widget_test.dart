@@ -39,5 +39,17 @@ void main() {
       expect(parseAmount('  99.99  '), equals(99.99));
       expect(parseAmount('abc'), equals(0.0));
     });
+
+    test('validates notary fee calculation estimate with mileage', () {
+      final estimate = SubscriptionService.calculateNotaryFeeEstimate(
+        signaturesCount: 3,
+        travelMiles: 20.0,
+        feePerSignature: 10.0,
+        mileageRate: 0.67,
+      );
+      expect(estimate['signatureTotal'], equals(30.0));
+      expect(estimate['travelTotal'], equals(13.4));
+      expect(estimate['totalEstimate'], equals(43.4));
+    });
   });
 }
