@@ -51,5 +51,20 @@ void main() {
       expect(estimate['travelTotal'], equals(13.4));
       expect(estimate['totalEstimate'], equals(43.4));
     });
+
+    test('validates annual notary business revenue projection & profit margin', () {
+      final projection = SubscriptionService.calculateAnnualNotaryBusinessRevenueProjection(
+        monthlyNotaryJobs: 20,
+        avgFeePerJob: 50.0,
+        monthlySoftwareExpenseUsd: 20.0,
+        monthlyMileageExpenseUsd: 30.0,
+      );
+      expect(projection['grossMonthlyRevenueUsd'], equals(1000.0));
+      expect(projection['grossAnnualRevenueUsd'], equals(12000.0));
+      expect(projection['annualExpensesUsd'], equals(600.0));
+      expect(projection['netAnnualProfitUsd'], equals(11400.0));
+      expect(projection['profitMarginPercentage'], equals(95.0));
+    });
   });
 }
+

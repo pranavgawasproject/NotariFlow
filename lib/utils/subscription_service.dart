@@ -298,6 +298,39 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate annual notary business revenue projection & profit margin
+  static Map<String, dynamic> calculateAnnualNotaryBusinessRevenueProjection({
+    required int monthlyNotaryJobs,
+    required double avgFeePerJob,
+    double monthlySoftwareExpenseUsd = 20.0,
+    double monthlyMileageExpenseUsd = 50.0,
+  }) {
+    final jobs = monthlyNotaryJobs < 0 ? 0 : monthlyNotaryJobs;
+    final fee = avgFeePerJob < 0 ? 0.0 : avgFeePerJob;
+    final softwareExp = monthlySoftwareExpenseUsd < 0 ? 0.0 : monthlySoftwareExpenseUsd;
+    final mileageExp = monthlyMileageExpenseUsd < 0 ? 0.0 : monthlyMileageExpenseUsd;
+
+    final grossMonthlyRevenueUsd = jobs * fee;
+    final grossAnnualRevenueUsd = grossMonthlyRevenueUsd * 12;
+    final annualExpensesUsd = (softwareExp + mileageExp) * 12;
+    final netAnnualProfitUsd = grossAnnualRevenueUsd - annualExpensesUsd;
+
+    final profitMarginPct = grossAnnualRevenueUsd > 0
+        ? ((netAnnualProfitUsd / grossAnnualRevenueUsd) * 100.0)
+        : 0.0;
+
+    return {
+      'monthlyNotaryJobs': jobs,
+      'avgFeePerJob': fee,
+      'grossMonthlyRevenueUsd': double.parse(grossMonthlyRevenueUsd.toStringAsFixed(2)),
+      'grossAnnualRevenueUsd': double.parse(grossAnnualRevenueUsd.toStringAsFixed(2)),
+      'annualExpensesUsd': double.parse(annualExpensesUsd.toStringAsFixed(2)),
+      'netAnnualProfitUsd': double.parse(netAnnualProfitUsd.toStringAsFixed(2)),
+      'profitMarginPercentage': double.parse(profitMarginPct.toStringAsFixed(1)),
+    };
+  }
+
+
 
 
 
