@@ -276,6 +276,29 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate annual tax savings and deduction from travel mileage logs
+  static Map<String, dynamic> calculateTravelMileageDeductionTaxSavings({
+    required double totalMiles,
+    double standardRatePerMile = 0.67,
+    double taxBracketPercentage = 22.0,
+  }) {
+    final miles = totalMiles < 0 ? 0.0 : totalMiles;
+    final rate = standardRatePerMile < 0 ? 0.67 : standardRatePerMile;
+    final bracket = taxBracketPercentage < 0 ? 22.0 : taxBracketPercentage;
+
+    final totalDeductionUsd = miles * rate;
+    final estimatedTaxSavedUsd = totalDeductionUsd * (bracket / 100.0);
+
+    return {
+      'totalMiles': double.parse(miles.toStringAsFixed(2)),
+      'ratePerMile': rate,
+      'taxBracketPercentage': bracket,
+      'totalDeductionUsd': double.parse(totalDeductionUsd.toStringAsFixed(2)),
+      'estimatedTaxSavedUsd': double.parse(estimatedTaxSavedUsd.toStringAsFixed(2)),
+    };
+  }
+
+
 
 
   /// Show premium upgrade dialog
