@@ -22,7 +22,7 @@ import 'widgets/premium_widgets.dart';
 
 // --- CONFIGURATION ---
 const firebaseOptions = FirebaseOptions(
-  apiKey: "AIzaSyCUYfhXTvTL9XGImXm3DOrMeM4iOQF8aLs",
+  apiKey: String.fromEnvironment('FIREBASE_API_KEY', defaultValue: ''),
   authDomain: "notariflow.firebaseapp.com",
   projectId: "notariflow",
   storageBucket: "notariflow.firebasestorage.app",
