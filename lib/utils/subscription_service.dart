@@ -354,9 +354,31 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate travel distance surcharge fee and total invoice estimate for mobile notary appointments
+  static Map<String, dynamic> calculateNotaryTravelDistanceFee({
+    required double travelDistanceMiles,
+    double baseTravelFeeUsd = 25.0,
+    double extraPerMileUsd = 1.50,
+    bool isAfterHoursOrWeekend = false,
+  }) {
+    final miles = travelDistanceMiles < 0 ? 0.0 : travelDistanceMiles;
+    final baseFee = baseTravelFeeUsd < 0 ? 25.0 : baseTravelFeeUsd;
+    final perMile = extraPerMileUsd < 0 ? 1.50 : extraPerMileUsd;
 
+    final distanceSurcharge = miles > 10 ? (miles - 10) * perMile : 0.0;
+    final afterHoursMultiplier = isAfterHoursOrWeekend ? 1.5 : 1.0;
 
+    final subtotalTravelFee = (baseFee + distanceSurcharge) * afterHoursMultiplier;
+    final totalTravelFeeUsd = double.parse(subtotalTravelFee.toStringAsFixed(2));
 
+    return {
+      'travelDistanceMiles': double.parse(miles.toStringAsFixed(2)),
+      'baseTravelFeeUsd': baseFee,
+      'distanceSurchargeUsd': double.parse(distanceSurcharge.toStringAsFixed(2)),
+      'isAfterHoursOrWeekend': isAfterHoursOrWeekend,
+      'totalTravelFeeUsd': totalTravelFeeUsd,
+    };
+  }
 
   /// Show premium upgrade dialog
   static void showPremiumDialog(BuildContext context, String feature) {
