@@ -330,6 +330,30 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate compliance score (0-100%) and missing audit fields for a notary journal record
+  static Map<String, dynamic> calculateNotaryDocumentComplianceScore({
+    required bool hasSignerIdType,
+    required bool hasSignerSignature,
+    required bool hasThumbprint,
+    required bool hasFeeRecorded,
+    required bool hasSealTimestamp,
+  }) {
+    int score = 0;
+    final List<String> missingFields = [];
+
+    if (hasSignerIdType) score += 25; else missingFields.add('Signer ID Type');
+    if (hasSignerSignature) score += 25; else missingFields.add('Signer Signature');
+    if (hasThumbprint) score += 20; else missingFields.add('Thumbprint');
+    if (hasFeeRecorded) score += 15; else missingFields.add('Fee Record');
+    if (hasSealTimestamp) score += 15; else missingFields.add('Seal Timestamp');
+
+    return {
+      'score': score,
+      'isCompliant': score >= 80,
+      'missingFields': missingFields,
+    };
+  }
+
 
 
 

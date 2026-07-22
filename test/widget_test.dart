@@ -65,6 +65,30 @@ void main() {
       expect(projection['netAnnualProfitUsd'], equals(11400.0));
       expect(projection['profitMarginPercentage'], equals(95.0));
     });
+
+    test('validates notary document compliance score and missing fields', () {
+      final score = SubscriptionService.calculateNotaryDocumentComplianceScore(
+        hasSignerIdType: true,
+        hasSignerSignature: true,
+        hasThumbprint: true,
+        hasFeeRecorded: true,
+        hasSealTimestamp: true,
+      );
+      expect(score['score'], equals(100));
+      expect(score['isCompliant'], isTrue);
+      expect(score['missingFields'], isEmpty);
+
+      final partial = SubscriptionService.calculateNotaryDocumentComplianceScore(
+        hasSignerIdType: true,
+        hasSignerSignature: false,
+        hasThumbprint: false,
+        hasFeeRecorded: true,
+        hasSealTimestamp: false,
+      );
+      expect(partial['score'], equals(40));
+      expect(partial['isCompliant'], isFalse);
+      expect(partial['missingFields'], contains('Signer Signature'));
+    });
   });
 }
 
