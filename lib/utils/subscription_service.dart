@@ -380,6 +380,35 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate loan signing package fee estimate with print page count & courier fee
+  static Map<String, dynamic> calculateLoanSigningPackageFee({
+    double basePackageFeeUsd = 150.0,
+    int pageCount = 100,
+    double printFeePerPageUsd = 0.25,
+    double shippingCourierFeeUsd = 25.0,
+    bool requireScanBacks = false,
+    double scanBackFeeUsd = 20.0,
+  }) {
+    final baseFee = basePackageFeeUsd < 0 ? 150.0 : basePackageFeeUsd;
+    final pages = pageCount < 0 ? 0 : pageCount;
+    final printFeeRate = printFeePerPageUsd < 0 ? 0.25 : printFeePerPageUsd;
+    final courierFee = shippingCourierFeeUsd < 0 ? 0.0 : shippingCourierFeeUsd;
+    final scanFee = scanBackFeeUsd < 0 ? 0.0 : scanBackFeeUsd;
+
+    final printTotalUsd = pages * printFeeRate;
+    final scanBackTotalUsd = requireScanBacks ? scanFee : 0.0;
+    final totalFeeUsd = baseFee + printTotalUsd + courierFee + scanBackTotalUsd;
+
+    return {
+      'basePackageFeeUsd': baseFee,
+      'pageCount': pages,
+      'printTotalUsd': double.parse(printTotalUsd.toStringAsFixed(2)),
+      'shippingCourierFeeUsd': courierFee,
+      'scanBackTotalUsd': double.parse(scanBackTotalUsd.toStringAsFixed(2)),
+      'totalFeeUsd': double.parse(totalFeeUsd.toStringAsFixed(2)),
+    };
+  }
+
   /// Show premium upgrade dialog
   static void showPremiumDialog(BuildContext context, String feature) {
     final user = FirebaseAuth.instance.currentUser;

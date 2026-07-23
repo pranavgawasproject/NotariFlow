@@ -89,6 +89,33 @@ void main() {
       expect(partial['isCompliant'], isFalse);
       expect(partial['missingFields'], contains('Signer Signature'));
     });
+
+    test('validates mobile notary travel distance fee calculation', () {
+      final feeResult = SubscriptionService.calculateNotaryTravelDistanceFee(
+        travelDistanceMiles: 20.0,
+        baseTravelFeeUsd: 25.0,
+        extraPerMileUsd: 1.50,
+        isAfterHoursOrWeekend: true,
+      );
+      // (25.0 + 10 * 1.50) * 1.5 = (25 + 15) * 1.5 = 60.0
+      expect(feeResult['distanceSurchargeUsd'], equals(15.0));
+      expect(feeResult['totalTravelFeeUsd'], equals(60.0));
+    });
+
+    test('validates loan signing package fee calculation', () {
+      final packageResult = SubscriptionService.calculateLoanSigningPackageFee(
+        basePackageFeeUsd: 150.0,
+        pageCount: 100,
+        printFeePerPageUsd: 0.25,
+        shippingCourierFeeUsd: 25.0,
+        requireScanBacks: true,
+        scanBackFeeUsd: 20.0,
+      );
+      // 150 + (100 * 0.25) + 25 + 20 = 150 + 25 + 25 + 20 = 220.0
+      expect(packageResult['printTotalUsd'], equals(25.0));
+      expect(packageResult['scanBackTotalUsd'], equals(20.0));
+      expect(packageResult['totalFeeUsd'], equals(220.0));
+    });
   });
 }
 
