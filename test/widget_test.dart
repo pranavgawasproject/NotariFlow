@@ -116,6 +116,26 @@ void main() {
       expect(packageResult['scanBackTotalUsd'], equals(20.0));
       expect(packageResult['totalFeeUsd'], equals(220.0));
     });
+
+    test('validates notary signer verification risk score calculation', () {
+      final lowRisk = SubscriptionService.calculateNotarySignerVerificationRiskScore(
+        isIdExpired: false,
+        distanceMismatchMiles: 5.0,
+        signatureMatchConfidencePct: 90.0,
+      );
+      expect(lowRisk['riskTier'], equals('LOW_RISK'));
+      expect(lowRisk['isApprovedForSigning'], isTrue);
+
+      final highRisk = SubscriptionService.calculateNotarySignerVerificationRiskScore(
+        isIdExpired: true,
+        distanceMismatchMiles: 30.0,
+        signatureMatchConfidencePct: 60.0,
+      );
+      expect(highRisk['riskTier'], equals('HIGH_RISK'));
+      expect(highRisk['requiresSecondaryVerification'], isTrue);
+      expect(highRisk['isApprovedForSigning'], isFalse);
+    });
   });
 }
+
 

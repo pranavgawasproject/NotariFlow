@@ -409,7 +409,49 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate notary signer verification risk score based on ID expiration, distance mismatch, and signature confidence
+  static Map<String, dynamic> calculateNotarySignerVerificationRiskScore({
+    required bool isIdExpired,
+    required double distanceMismatchMiles,
+    required double signatureMatchConfidencePct,
+  }) {
+    final miles = distanceMismatchMiles < 0 ? 0.0 : distanceMismatchMiles;
+    final confidence = signatureMatchConfidencePct < 0 ? 0.0 : (signatureMatchConfidencePct > 100 ? 100.0 : signatureMatchConfidencePct);
+
+    double riskScore = 10.0;
+    if (isIdExpired) riskScore += 50.0;
+    if (miles > 25) {
+      riskScore += 25.0;
+    } else if (miles > 10) {
+      riskScore += 15.0;
+    }
+
+    if (confidence < 70) {
+      riskScore += 20.0;
+    } else if (confidence < 85) {
+      riskScore += 10.0;
+    }
+
+    final finalRiskScore = riskScore > 100.0 ? 100.0 : double.parse(riskScore.toStringAsFixed(1));
+    final String riskTier;
+    if (finalRiskScore >= 60) {
+      riskTier = 'HIGH_RISK';
+    } else if (finalRiskScore >= 35) {
+      riskTier = 'MODERATE_RISK';
+    } else {
+      riskTier = 'LOW_RISK';
+    }
+
+    return {
+      'riskScore': finalRiskScore,
+      'riskTier': riskTier,
+      'requiresSecondaryVerification': finalRiskScore >= 50,
+      'isApprovedForSigning': finalRiskScore < 60 && !isIdExpired,
+    };
+  }
+
   /// Show premium upgrade dialog
+
   static void showPremiumDialog(BuildContext context, String feature) {
     final user = FirebaseAuth.instance.currentUser;
     final userEmail = user?.email ?? '';
