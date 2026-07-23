@@ -450,6 +450,50 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate notary journal audit compliance index based on missing signatures, thumbprints, and seal details
+  static Map<String, dynamic> calculateNotaryJournalAuditComplianceIndex({
+    required int totalJournalEntries,
+    int missingSignatureCount = 0,
+    int missingThumbprintCount = 0,
+    bool includesStampDetails = true,
+  }) {
+    final entries = totalJournalEntries < 0 ? 0 : totalJournalEntries;
+    if (entries == 0) {
+      return {
+        'complianceScore': 100.0,
+        'auditGrade': 'A+',
+        'isAuditReady': true,
+        'totalJournalEntries': 0,
+      };
+    }
+
+    final sigErrors = missingSignatureCount < 0 ? 0 : missingSignatureCount;
+    final thumbErrors = missingThumbprintCount < 0 ? 0 : missingThumbprintCount;
+
+    double score = 100.0;
+    score -= (sigErrors / entries) * 40.0;
+    score -= (thumbErrors / entries) * 30.0;
+    if (!includesStampDetails) score -= 15.0;
+
+    final finalScore = score < 0 ? 0.0 : double.parse(score.toStringAsFixed(1));
+    final String auditGrade;
+    if (finalScore >= 90) {
+      auditGrade = 'A+';
+    } else if (finalScore >= 75) {
+      auditGrade = 'B';
+    } else {
+      auditGrade = 'C';
+    }
+
+    return {
+      'complianceScore': finalScore,
+      'auditGrade': auditGrade,
+      'isAuditReady': finalScore >= 80,
+      'totalJournalEntries': entries,
+    };
+  }
+
+
   /// Show premium upgrade dialog
 
   static void showPremiumDialog(BuildContext context, String feature) {
