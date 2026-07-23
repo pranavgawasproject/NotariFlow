@@ -493,6 +493,33 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate remote online notarization (RON) fee schedule including platform fee and video recording archive fee
+  static Map<String, dynamic> calculateRemoteOnlineNotarizationFeeSchedule({
+    double baseRonFeeUsd = 25.0,
+    int additionalSignerCount = 0,
+    double extraSignerFeeUsd = 10.0,
+    bool includesVideoArchiveStorage = true,
+    double archiveStorageFeeUsd = 5.0,
+  }) {
+    final baseFee = baseRonFeeUsd < 0 ? 25.0 : baseRonFeeUsd;
+    final signers = additionalSignerCount < 0 ? 0 : additionalSignerCount;
+    final extraFeeRate = extraSignerFeeUsd < 0 ? 10.0 : extraSignerFeeUsd;
+    final archiveFee = includesVideoArchiveStorage ? (archiveStorageFeeUsd < 0 ? 0.0 : archiveStorageFeeUsd) : 0.0;
+
+    final additionalSignerTotal = signers * extraFeeRate;
+    final totalRonFeeUsd = baseFee + additionalSignerTotal + archiveFee;
+
+    return {
+      'baseRonFeeUsd': baseFee,
+      'additionalSignerCount': signers,
+      'additionalSignerTotalUsd': double.parse(additionalSignerTotal.toStringAsFixed(2)),
+      'includesVideoArchiveStorage': includesVideoArchiveStorage,
+      'archiveStorageFeeUsd': archiveFee,
+      'totalRonFeeUsd': double.parse(totalRonFeeUsd.toStringAsFixed(2)),
+    };
+  }
+
+
 
   /// Show premium upgrade dialog
 

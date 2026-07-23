@@ -135,7 +135,22 @@ void main() {
       expect(highRisk['requiresSecondaryVerification'], isTrue);
       expect(highRisk['isApprovedForSigning'], isFalse);
     });
+
+    test('validates remote online notarization (RON) fee schedule calculation', () {
+      final ronResult = SubscriptionService.calculateRemoteOnlineNotarizationFeeSchedule(
+        baseRonFeeUsd: 25.0,
+        additionalSignerCount: 2,
+        extraSignerFeeUsd: 10.0,
+        includesVideoArchiveStorage: true,
+        archiveStorageFeeUsd: 5.0,
+      );
+      expect(ronResult['baseRonFeeUsd'], equals(25.0));
+      expect(ronResult['additionalSignerTotalUsd'], equals(20.0));
+      expect(ronResult['archiveStorageFeeUsd'], equals(5.0));
+      expect(ronResult['totalRonFeeUsd'], equals(50.0));
+    });
   });
 }
+
 
 
