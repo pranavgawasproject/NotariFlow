@@ -780,7 +780,38 @@ class SubscriptionService {
           : 'Require additional credential analysis or secondary Knowledge-Based Authentication (KBA).',
     };
   }
+
+  /// Calculates notary state fee cap compliance and overcharge alert status
+  static Map<String, dynamic> calculateNotaryStateFeeCapCompliance({
+    required double chargedFeePerSignature,
+    double stateMaxFeeCap = 10.0,
+    int signaturesCount = 1,
+  }) {
+    final fee = chargedFeePerSignature < 0 ? 0.0 : chargedFeePerSignature;
+    final cap = stateMaxFeeCap <= 0 ? 10.0 : stateMaxFeeCap;
+    final count = signaturesCount <= 0 ? 1 : signaturesCount;
+
+    final maxAllowableTotal = cap * count;
+    final actualChargedTotal = fee * count;
+    final overchargeAmount = (actualChargedTotal - maxAllowableTotal).clamp(0.0, double.infinity);
+    final isCompliant = actualChargedTotal <= maxAllowableTotal;
+
+    return {
+      'valid': true,
+      'chargedFeePerSignature': fee,
+      'stateMaxFeeCap': cap,
+      'signaturesCount': count,
+      'actualChargedTotal': double.parse(actualChargedTotal.toStringAsFixed(2)),
+      'maxAllowableTotal': double.parse(maxAllowableTotal.toStringAsFixed(2)),
+      'overchargeAmount': double.parse(overchargeAmount.toStringAsFixed(2)),
+      'isCompliant': isCompliant,
+      'recommendation': isCompliant
+          ? 'Notary fee is compliant with state statutory fee caps.'
+          : 'Fee exceeds state statutory cap by \$${overchargeAmount.toStringAsFixed(2)}. Adjust fee rate to ensure legal compliance.',
+    };
+  }
 }
+
 
 
 
