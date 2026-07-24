@@ -519,6 +519,29 @@ class SubscriptionService {
     };
   }
 
+  /// Calculate RON (Remote Online Notarization) session compliance score
+  static Map<String, dynamic> calculateNotarySessionComplianceScore({
+    required bool isAudioVideoRecorded,
+    required bool isKbaIdentityVerified,
+    required bool isCredentialAnalysisPassed,
+    required bool isDigitalSignatureAttached,
+  }) {
+    int score = 0;
+    final List<String> pendingVerifications = [];
+
+    if (isAudioVideoRecorded) score += 30; else pendingVerifications.add('Audio/Video Recording');
+    if (isKbaIdentityVerified) score += 30; else pendingVerifications.add('Knowledge-Based Auth');
+    if (isCredentialAnalysisPassed) score += 20; else pendingVerifications.add('ID Credential Analysis');
+    if (isDigitalSignatureAttached) score += 20; else pendingVerifications.add('Digital PKI Signature');
+
+    return {
+      'score': score,
+      'isSessionCompliant': score >= 80,
+      'pendingVerifications': pendingVerifications,
+    };
+  }
+
+
 
 
   /// Show premium upgrade dialog
