@@ -851,9 +851,58 @@ class SubscriptionService {
           : 'Complete missing notary seals, signatures, or credential verification before finalizing document.',
     };
   }
+
+  /// Calculates notary journal audit readiness score based on statutory journal record completeness
+  static Map<String, dynamic> calculateNotaryJournalAuditReadinessScore({
+    int requiredEntriesCount = 5,
+    int completedSignaturesCount = 5,
+    bool biometricThumbprintCollected = true,
+    String idVerificationType = 'government_id',
+    bool hasLocationCoordinates = true,
+  }) {
+    if (requiredEntriesCount <= 0) {
+      return {
+        'valid': false,
+        'error': 'Required entries count must be positive',
+      };
+    }
+
+    int score = 0;
+    final double completionRate = (completedSignaturesCount / requiredEntriesCount).clamp(0.0, 1.0);
+    score += (completionRate * 40).round();
+
+    if (biometricThumbprintCollected) score += 20;
+    if (hasLocationCoordinates) score += 15;
+
+    if (idVerificationType == 'government_id' || idVerificationType == 'passport') {
+      score += 25;
+    } else if (idVerificationType == 'credible_witness') {
+      score += 15;
+    }
+
+    score = score.clamp(0, 100);
+    final bool isAuditReady = score >= 80;
+    
+    String readinessTier = 'AUDIT_READY';
+    if (score < 50) {
+      readinessTier = 'HIGH_AUDIT_RISK';
+    } else if (score < 80) {
+      readinessTier = 'PARTIALLY_COMPLETE';
+    }
+
+    return {
+      'valid': true,
+      'requiredEntriesCount': requiredEntriesCount,
+      'completedSignaturesCount': completedSignaturesCount,
+      'biometricThumbprintCollected': biometricThumbprintCollected,
+      'idVerificationType': idVerificationType,
+      'hasLocationCoordinates': hasLocationCoordinates,
+      'auditScore': score,
+      'isAuditReady': isAuditReady,
+      'readinessTier': readinessTier,
+      'recommendation': isAuditReady
+          ? 'Notary journal record is audit-ready and fully complies with state notary board standards.'
+          : 'Record missing required journal fields or ID verification details prior to state audit.',
+    };
+  }
 }
-
-
-
-
-

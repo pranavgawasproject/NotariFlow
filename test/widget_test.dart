@@ -176,8 +176,23 @@ void main() {
       expect(result['isCompliant'], isTrue);
       expect(result['complianceTier'], equals('RON_COMPLIANT'));
     });
+
+    test('validates notary journal audit readiness score', () {
+      final result = SubscriptionService.calculateNotaryJournalAuditReadinessScore(
+        requiredEntriesCount: 5,
+        completedSignaturesCount: 5,
+        biometricThumbprintCollected: true,
+        idVerificationType: 'government_id',
+        hasLocationCoordinates: true,
+      );
+      expect(result['valid'], isTrue);
+      expect(result['auditScore'], equals(100));
+      expect(result['isAuditReady'], isTrue);
+      expect(result['readinessTier'], equals('AUDIT_READY'));
+    });
   });
 }
+
 
 
 
