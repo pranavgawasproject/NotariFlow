@@ -692,5 +692,55 @@ class SubscriptionService {
           : 'Enable encrypted backup and digital signatures to achieve full compliance.',
     };
   }
+
+  /// Calculates notary journal audit readiness score and compliance recommendations
+  static Map<String, dynamic> calculateNotaryJournalAuditReadinessScore({
+    int totalEntries = 10,
+    int missingSignatures = 0,
+    int missingOcrData = 0,
+    bool hasBiometricVerification = false,
+  }) {
+    if (totalEntries <= 0) {
+      return {
+        'valid': false,
+        'error': 'Total entries must be a positive integer',
+        'score': 0,
+        'isReady': false,
+      };
+    }
+
+    final int cleanSignatures = (totalEntries - missingSignatures).clamp(0, totalEntries);
+    final int cleanOcr = (totalEntries - missingOcrData).clamp(0, totalEntries);
+
+    final double signatureRatio = cleanSignatures / totalEntries;
+    final double ocrRatio = cleanOcr / totalEntries;
+
+    int score = ((signatureRatio * 50) + (ocrRatio * 40)).round();
+    if (hasBiometricVerification) score += 10;
+    score = score.clamp(0, 100);
+
+    final bool isReady = score >= 80;
+    String auditGrade = 'EXCELLENT';
+    if (score < 50) {
+      auditGrade = 'HIGH_RISK';
+    } else if (score < 80) {
+      auditGrade = 'MODERATE_RISK';
+    }
+
+    return {
+      'valid': true,
+      'totalEntries': totalEntries,
+      'missingSignatures': missingSignatures,
+      'missingOcrData': missingOcrData,
+      'hasBiometricVerification': hasBiometricVerification,
+      'score': score,
+      'isReady': isReady,
+      'auditGrade': auditGrade,
+      'recommendation': isReady
+          ? 'Journal entries are audit-ready with complete signatures and OCR data.'
+          : 'Complete missing client signatures and scanned IDs before submitting for state audit.',
+    };
+  }
 }
+
 
