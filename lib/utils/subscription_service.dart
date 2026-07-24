@@ -645,4 +645,52 @@ class SubscriptionService {
       ),
     );
   }
+
+  /// Calculates notary document retention compliance score and risk grade
+  static Map<String, dynamic> calculateNotaryDocumentRetentionPolicyScore({
+    int retentionYears = 7,
+    bool hasEncryptedBackup = true,
+    bool isAuditLogged = true,
+    bool hasDigitalSignature = true,
+  }) {
+    int score = 0;
+    if (retentionYears >= 10) {
+      score += 40;
+    } else if (retentionYears >= 7) {
+      score += 30;
+    } else if (retentionYears >= 5) {
+      score += 15;
+    }
+
+    if (hasEncryptedBackup) score += 25;
+    if (isAuditLogged) score += 20;
+    if (hasDigitalSignature) score += 15;
+
+    score = score > 100 ? 100 : score;
+    final bool isCompliant = score >= 70;
+    String grade = 'EXCELLENT';
+
+    if (score < 50) {
+      grade = 'NON_COMPLIANT';
+    } else if (score < 70) {
+      grade = 'NEEDS_IMPROVEMENT';
+    } else if (score < 85) {
+      grade = 'SATISFACTORY';
+    }
+
+    return {
+      'valid': true,
+      'retentionYears': retentionYears,
+      'hasEncryptedBackup': hasEncryptedBackup,
+      'isAuditLogged': isAuditLogged,
+      'hasDigitalSignature': hasDigitalSignature,
+      'score': score,
+      'isCompliant': isCompliant,
+      'retentionGrade': grade,
+      'recommendation': isCompliant
+          ? 'Notary journal entries meet state legal retention policy requirements.'
+          : 'Enable encrypted backup and digital signatures to achieve full compliance.',
+    };
+  }
 }
+
