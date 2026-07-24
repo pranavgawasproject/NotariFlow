@@ -810,7 +810,49 @@ class SubscriptionService {
           : 'Fee exceeds state statutory cap by \$${overchargeAmount.toStringAsFixed(2)}. Adjust fee rate to ensure legal compliance.',
     };
   }
+
+  /// Calculates notary document compliance score and tamper-evident readiness for RON
+  static Map<String, dynamic> calculateNotaryDocumentComplianceScore({
+    bool hasValidSignatures = true,
+    bool hasNotarySeal = true,
+    bool isIdentityVerified = true,
+    bool isTamperEvidentHashPresent = true,
+    int missingFieldsCount = 0,
+  }) {
+    int score = 0;
+    if (hasValidSignatures) score += 30;
+    if (hasNotarySeal) score += 30;
+    if (isIdentityVerified) score += 25;
+    if (isTamperEvidentHashPresent) score += 15;
+
+    final missing = missingFieldsCount.clamp(0, 10);
+    score = (score - (missing * 10)).clamp(0, 100);
+
+    final bool isCompliant = score >= 80;
+    String complianceTier = 'RON_COMPLIANT';
+    if (score < 50) {
+      complianceTier = 'NON_COMPLIANT';
+    } else if (score < 80) {
+      complianceTier = 'NEEDS_REVISION';
+    }
+
+    return {
+      'valid': true,
+      'hasValidSignatures': hasValidSignatures,
+      'hasNotarySeal': hasNotarySeal,
+      'isIdentityVerified': isIdentityVerified,
+      'isTamperEvidentHashPresent': isTamperEvidentHashPresent,
+      'missingFieldsCount': missing,
+      'complianceScore': score,
+      'isCompliant': isCompliant,
+      'complianceTier': complianceTier,
+      'recommendation': isCompliant
+          ? 'Document meets all Remote Online Notarization (RON) compliance and sealing standards.'
+          : 'Complete missing notary seals, signatures, or credential verification before finalizing document.',
+    };
+  }
 }
+
 
 
 

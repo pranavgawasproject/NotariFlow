@@ -162,8 +162,23 @@ void main() {
       expect(result['isVerified'], isTrue);
       expect(result['confidenceTier'], equals('HIGH_CONFIDENCE'));
     });
+
+    test('validates notary document compliance score and tamper-evident readiness for RON', () {
+      final result = SubscriptionService.calculateNotaryDocumentComplianceScore(
+        hasValidSignatures: true,
+        hasNotarySeal: true,
+        isIdentityVerified: true,
+        isTamperEvidentHashPresent: true,
+        missingFieldsCount: 0,
+      );
+      expect(result['valid'], isTrue);
+      expect(result['complianceScore'], equals(100));
+      expect(result['isCompliant'], isTrue);
+      expect(result['complianceTier'], equals('RON_COMPLIANT'));
+    });
   });
 }
+
 
 
 
