@@ -741,6 +741,46 @@ class SubscriptionService {
           : 'Complete missing client signatures and scanned IDs before submitting for state audit.',
     };
   }
+
+  /// Calculates notary identity verification confidence score for remote online notarization (RON)
+  static Map<String, dynamic> calculateNotaryIdentityVerificationConfidenceScore({
+    bool isGovernmentIdVerified = true,
+    bool isKbaPassed = true,
+    double facialBiometricMatchScore = 95.0,
+    bool isAntiSpoofingCheckPassed = true,
+  }) {
+    int score = 0;
+    if (isGovernmentIdVerified) score += 35;
+    if (isKbaPassed) score += 25;
+    if (isAntiSpoofingCheckPassed) score += 20;
+
+    final matchScore = facialBiometricMatchScore.clamp(0.0, 100.0);
+    score += ((matchScore / 100.0) * 20.0).round();
+    score = score.clamp(0, 100);
+
+    final bool isVerified = score >= 80;
+    String confidenceTier = 'HIGH_CONFIDENCE';
+    if (score < 50) {
+      confidenceTier = 'UNVERIFIED';
+    } else if (score < 80) {
+      confidenceTier = 'MODERATE_CONFIDENCE';
+    }
+
+    return {
+      'valid': true,
+      'isGovernmentIdVerified': isGovernmentIdVerified,
+      'isKbaPassed': isKbaPassed,
+      'facialBiometricMatchScore': matchScore,
+      'isAntiSpoofingCheckPassed': isAntiSpoofingCheckPassed,
+      'confidenceScore': score,
+      'isVerified': isVerified,
+      'confidenceTier': confidenceTier,
+      'recommendation': isVerified
+          ? 'Identity verification confidence score exceeds state RON compliance thresholds.'
+          : 'Require additional credential analysis or secondary Knowledge-Based Authentication (KBA).',
+    };
+  }
 }
+
 
 

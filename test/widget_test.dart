@@ -149,6 +149,19 @@ void main() {
       expect(ronResult['archiveStorageFeeUsd'], equals(5.0));
       expect(ronResult['totalRonFeeUsd'], equals(50.0));
     });
+
+    test('validates notary identity verification confidence score calculation', () {
+      final result = SubscriptionService.calculateNotaryIdentityVerificationConfidenceScore(
+        isGovernmentIdVerified: true,
+        isKbaPassed: true,
+        facialBiometricMatchScore: 95.0,
+        isAntiSpoofingCheckPassed: true,
+      );
+      expect(result['valid'], isTrue);
+      expect(result['confidenceScore'], equals(99));
+      expect(result['isVerified'], isTrue);
+      expect(result['confidenceTier'], equals('HIGH_CONFIDENCE'));
+    });
   });
 }
 
