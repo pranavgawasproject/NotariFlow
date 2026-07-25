@@ -961,5 +961,51 @@ class SubscriptionService {
       'recommendation': recommendation,
     };
   }
+
+  /// Calculates Remote Online Notarization (RON) session security & verification score
+  static Map<String, dynamic> calculateNotaryRemoteOnlineNotarizationSessionScore({
+    bool audioVideoQualityOk = true,
+    bool idCredentialAnalysisPassed = true,
+    bool kbaPassed = true,
+    bool electronicSealAffixed = true,
+    int participantCount = 2,
+  }) {
+    if (participantCount <= 0) {
+      return {
+        'valid': false,
+        'error': 'Participant count must be at least 1',
+      };
+    }
+
+    int score = 0;
+    if (audioVideoQualityOk) score += 25;
+    if (idCredentialAnalysisPassed) score += 30;
+    if (kbaPassed) score += 25;
+    if (electronicSealAffixed) score += 20;
+
+    final bool isSessionVerified = score >= 80;
+    String sessionTier = 'RON_SESSION_VERIFIED';
+    if (score < 50) {
+      sessionTier = 'REAUTHENTICATION_REQUIRED';
+    } else if (score < 80) {
+      sessionTier = 'PARTIAL_VERIFICATION';
+    }
+
+    return {
+      'valid': true,
+      'audioVideoQualityOk': audioVideoQualityOk,
+      'idCredentialAnalysisPassed': idCredentialAnalysisPassed,
+      'kbaPassed': kbaPassed,
+      'electronicSealAffixed': electronicSealAffixed,
+      'participantCount': participantCount,
+      'ronSessionScore': score,
+      'isSessionVerified': isSessionVerified,
+      'sessionTier': sessionTier,
+      'recommendation': isSessionVerified
+          ? 'RON live video session verified with tamper-evident digital seal.'
+          : 'Re-authenticate signer credentials and verify high-definition audio/video stream.',
+    };
+  }
 }
+
 
