@@ -1090,6 +1090,53 @@ class SubscriptionService {
           : 'Audit trail integrity warning: verified hash chain count or digital seal discrepancy detected.',
     };
   }
+
+  /// Calculates notary journal entry completeness score and statutory compliance tier
+  static Map<String, dynamic> calculateNotaryJournalEntryCompleteness({
+    required String documentType,
+    required String idVerificationType,
+    bool isSignerSignatureCaptured = true,
+    bool isThumbprintCaptured = false,
+    bool isRealEstateTransaction = false,
+    double notaryFeeUsd = 15.0,
+  }) {
+    if (documentType.trim().isEmpty) {
+      return {
+        'valid': false,
+        'error': 'Document type cannot be empty',
+      };
+    }
+
+    int score = 0;
+    if (documentType.trim().isNotEmpty) score += 20;
+    if (idVerificationType.trim().isNotEmpty && idVerificationType.toUpperCase() != 'NONE') score += 30;
+    if (isSignerSignatureCaptured) score += 25;
+    if (notaryFeeUsd >= 0) score += 15;
+
+    if (isRealEstateTransaction) {
+      if (isThumbprintCaptured) score += 10;
+    } else {
+      score += 10;
+    }
+
+    score = score.clamp(0, 100);
+    final bool isCompliant = score >= 80 && (isRealEstateTransaction ? isThumbprintCaptured : true);
+
+    return {
+      'valid': true,
+      'documentType': documentType,
+      'idVerificationType': idVerificationType,
+      'isSignerSignatureCaptured': isSignerSignatureCaptured,
+      'isThumbprintCaptured': isThumbprintCaptured,
+      'isRealEstateTransaction': isRealEstateTransaction,
+      'notaryFeeUsd': notaryFeeUsd,
+      'completenessScore': score,
+      'isCompliant': isCompliant,
+      'recommendation': isCompliant
+          ? 'Notary journal entry is fully compliant with state statutory requirements.'
+          : 'Journal entry incomplete: verify signer ID type, signature, or thumbprint requirement for real estate transactions.',
+    };
+  }
 }
 
 

@@ -189,6 +189,21 @@ void main() {
       expect(result['auditIntegrityScore'], equals(100));
       expect(result['isIntegrityVerified'], isTrue);
     });
+
+    test('validates notary journal entry completeness score', () {
+      final result = SubscriptionService.calculateNotaryJournalEntryCompleteness(
+        documentType: 'Grant Deed',
+        idVerificationType: 'Drivers License',
+        isSignerSignatureCaptured: true,
+        isThumbprintCaptured: true,
+        isRealEstateTransaction: true,
+        notaryFeeUsd: 15.0,
+      );
+      expect(result['valid'], isTrue);
+      expect(result['completenessScore'], equals(100));
+      expect(result['isCompliant'], isTrue);
+      expect(result['recommendation'], contains('fully compliant'));
+    });
   });
 }
 
