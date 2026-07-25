@@ -204,8 +204,24 @@ void main() {
       expect(result['isCompliant'], isTrue);
       expect(result['recommendation'], contains('fully compliant'));
     });
+
+    test('validates notary biometric authentication score calculation', () {
+      final result = SubscriptionService.calculateNotaryBiometricAuthenticationScore(
+        isFacialMatchVerified: true,
+        facialMatchConfidencePct: 98.0,
+        isLivenessDetected: true,
+        isIdDocumentBarcodeScanned: true,
+        idMatchConfidencePct: 95.0,
+      );
+      expect(result['valid'], isTrue);
+      expect(result['authScore'], equals(99));
+      expect(result['authTier'], equals('BIOMETRIC_VERIFIED'));
+      expect(result['isAuthentic'], isTrue);
+      expect(result['recommendation'], contains('verified successfully'));
+    });
   });
 }
+
 
 
 

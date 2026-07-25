@@ -1137,7 +1137,58 @@ class SubscriptionService {
           : 'Journal entry incomplete: verify signer ID type, signature, or thumbprint requirement for real estate transactions.',
     };
   }
+
+  static Map<String, dynamic> calculateNotaryBiometricAuthenticationScore({
+    required bool isFacialMatchVerified,
+    required double facialMatchConfidencePct,
+    required bool isLivenessDetected,
+    required bool isIdDocumentBarcodeScanned,
+    required double idMatchConfidencePct,
+  }) {
+    if (facialMatchConfidencePct < 0 || idMatchConfidencePct < 0) {
+      return {
+        'valid': false,
+        'error': 'Match confidence percentages cannot be negative',
+      };
+    }
+
+    int score = 0;
+    if (isFacialMatchVerified) score += 30;
+    score += (facialMatchConfidencePct.clamp(0.0, 100.0) * 0.3).round();
+    if (isLivenessDetected) score += 20;
+    if (isIdDocumentBarcodeScanned) score += 10;
+    score += (idMatchConfidencePct.clamp(0.0, 100.0) * 0.1).round();
+
+    score = score.clamp(0, 100);
+
+    String authTier = 'BIOMETRIC_VERIFIED';
+    if (score < 60) {
+      authTier = 'AUTHENTICATION_FAILED';
+    } else if (score < 85) {
+      authTier = 'MANUAL_REVIEW_REQUIRED';
+    }
+
+    final bool isAuthentic = score >= 85 && isLivenessDetected && isFacialMatchVerified;
+
+    return {
+      'valid': true,
+      'isFacialMatchVerified': isFacialMatchVerified,
+      'facialMatchConfidencePct': facialMatchConfidencePct,
+      'isLivenessDetected': isLivenessDetected,
+      'isIdDocumentBarcodeScanned': isIdDocumentBarcodeScanned,
+      'idMatchConfidencePct': idMatchConfidencePct,
+      'authScore': score,
+      'authTier': authTier,
+      'isAuthentic': isAuthentic,
+      'recommendation': isAuthentic
+          ? 'Signer identity bio-authentication verified successfully.'
+          : (authTier == 'MANUAL_REVIEW_REQUIRED'
+              ? 'Biometric score acceptable but requires secondary notary manual review.'
+              : 'Biometric authentication failed. Re-verify signer photo ID and liveness check.'),
+    };
+  }
 }
+
 
 
 
