@@ -1051,7 +1051,47 @@ class SubscriptionService {
           : 'Document retention storage within safe capacity ($storedDocumentsCount documents archived).',
     };
   }
+
+  /// Calculates notary compliance audit trail integrity score and tamper verification state
+  static Map<String, dynamic> calculateNotaryComplianceAuditTrailIntegrity({
+    required int totalAuditLogs,
+    required int verifiedHashChainCount,
+    bool isTimestampAuthorityVerified = true,
+    bool isTamperProofSealValid = true,
+  }) {
+    if (totalAuditLogs <= 0) {
+      return {
+        'valid': false,
+        'error': 'Total audit logs count must be greater than zero',
+      };
+    }
+
+    final int validLogs = verifiedHashChainCount.clamp(0, totalAuditLogs);
+    final double hashChainIntegrityPct = (validLogs / totalAuditLogs) * 100;
+
+    int score = (hashChainIntegrityPct * 0.6).round();
+    if (isTimestampAuthorityVerified) score += 20;
+    if (isTamperProofSealValid) score += 20;
+    score = score.clamp(0, 100);
+
+    final bool isIntegrityVerified = score >= 85 && isTamperProofSealValid;
+
+    return {
+      'valid': true,
+      'totalAuditLogs': totalAuditLogs,
+      'verifiedHashChainCount': validLogs,
+      'hashChainIntegrityPct': double.parse(hashChainIntegrityPct.toStringAsFixed(1)),
+      'isTimestampAuthorityVerified': isTimestampAuthorityVerified,
+      'isTamperProofSealValid': isTamperProofSealValid,
+      'auditIntegrityScore': score,
+      'isIntegrityVerified': isIntegrityVerified,
+      'recommendation': isIntegrityVerified
+          ? 'Audit trail hash chain verified and tamper-proof digital seal intact.'
+          : 'Audit trail integrity warning: verified hash chain count or digital seal discrepancy detected.',
+    };
+  }
 }
+
 
 
 
