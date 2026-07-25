@@ -1187,7 +1187,53 @@ class SubscriptionService {
               : 'Biometric authentication failed. Re-verify signer photo ID and liveness check.'),
     };
   }
+
+  /// Calculates signer identity fraud risk score and automated compliance check
+  static Map<String, dynamic> calculateNotaryIdentityFraudRiskScore({
+    double documentMatchScore = 90.0,
+    double biometricLivenessScore = 95.0,
+    bool ipGeolocationMatches = true,
+    double kbaPassRate = 100.0,
+  }) {
+    if (documentMatchScore < 0 || biometricLivenessScore < 0 || kbaPassRate < 0) {
+      return {
+        'valid': false,
+        'error': 'Verification scores cannot be negative',
+      };
+    }
+
+    double riskPoints = 0;
+    if (documentMatchScore < 70) riskPoints += 40;
+    if (biometricLivenessScore < 80) riskPoints += 30;
+    if (!ipGeolocationMatches) riskPoints += 20;
+    if (kbaPassRate < 80) riskPoints += 15;
+
+    final double fraudRiskScore = riskPoints.clamp(0.0, 100.0);
+    String riskTier = 'LOW_RISK';
+    if (fraudRiskScore >= 60) {
+      riskTier = 'HIGH_FRAUD_RISK';
+    } else if (fraudRiskScore >= 30) {
+      riskTier = 'MODERATE_RISK';
+    }
+
+    final bool isApproved = riskTier == 'LOW_RISK';
+
+    return {
+      'valid': true,
+      'documentMatchScore': documentMatchScore,
+      'biometricLivenessScore': biometricLivenessScore,
+      'ipGeolocationMatches': ipGeolocationMatches,
+      'kbaPassRate': kbaPassRate,
+      'fraudRiskScore': fraudRiskScore,
+      'riskTier': riskTier,
+      'isApproved': isApproved,
+      'recommendation': isApproved
+          ? 'Signer fraud risk low ($fraudRiskScore/100). Approved for electronic notarization.'
+          : 'High fraud risk detected ($fraudRiskScore/100). Require second form of identification.',
+    };
+  }
 }
+
 
 
 
