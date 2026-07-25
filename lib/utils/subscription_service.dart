@@ -905,4 +905,61 @@ class SubscriptionService {
           : 'Record missing required journal fields or ID verification details prior to state audit.',
     };
   }
+
+  /// Calculates notary commission renewal status, statutory bond sufficiency, and CE requirements
+  static Map<String, dynamic> calculateNotaryCommissionRenewalStatus({
+    required String expirationDateIsoString,
+    int continuingEducationHoursCompleted = 12,
+    int continuingEducationHoursRequired = 12,
+    double bondCoverageAmountUsd = 25000,
+    bool isErrorsAndOmissionsInsured = true,
+  }) {
+    DateTime? expiryDate;
+    try {
+      expiryDate = DateTime.parse(expirationDateIsoString);
+    } catch (_) {
+      return {
+        'valid': false,
+        'error': 'Invalid expiration date string provided. Must be ISO-8601 format.',
+      };
+    }
+
+    final now = DateTime.now();
+    final daysRemaining = expiryDate.difference(now).inDays;
+    final isExpired = daysRemaining <= 0;
+    final ceComplete = continuingEducationHoursCompleted >= continuingEducationHoursRequired;
+
+    String renewalTier = 'ACTIVE_COMMISSION';
+    if (isExpired) {
+      renewalTier = 'COMMISSION_EXPIRED';
+    } else if (daysRemaining <= 30) {
+      renewalTier = 'CRITICAL_RENEWAL_WINDOW';
+    } else if (daysRemaining <= 90) {
+      renewalTier = 'UPCOMING_RENEWAL';
+    }
+
+    String recommendation = 'Commission active and fully compliant with state regulations.';
+    if (isExpired) {
+      recommendation = 'Commission has expired. Cease all notary acts until state recommissioning is approved.';
+    } else if (renewalTier == 'CRITICAL_RENEWAL_WINDOW') {
+      recommendation = 'Urgent: Submit notary recommission application and updated surety bond immediately.';
+    } else if (!ceComplete) {
+      recommendation = 'Complete required continuing education hours prior to commission renewal application.';
+    }
+
+    return {
+      'valid': true,
+      'expirationDateIsoString': expirationDateIsoString,
+      'daysRemaining': daysRemaining,
+      'isExpired': isExpired,
+      'ceComplete': ceComplete,
+      'continuingEducationHoursCompleted': continuingEducationHoursCompleted,
+      'continuingEducationHoursRequired': continuingEducationHoursRequired,
+      'bondCoverageAmountUsd': bondCoverageAmountUsd,
+      'isErrorsAndOmissionsInsured': isErrorsAndOmissionsInsured,
+      'renewalTier': renewalTier,
+      'recommendation': recommendation,
+    };
+  }
 }
+
