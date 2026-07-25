@@ -1006,6 +1006,52 @@ class SubscriptionService {
           : 'Re-authenticate signer credentials and verify high-definition audio/video stream.',
     };
   }
+
+  /// Calculates notary document storage retention, cloud backup quota, and archival status
+  static Map<String, dynamic> calculateNotaryDocumentStorageRetentionQuota({
+    required int storedDocumentsCount,
+    required double totalStorageUsedMb,
+    double maxStorageQuotaMb = 500.0,
+    int retentionYearsRequired = 7,
+  }) {
+    if (storedDocumentsCount < 0) {
+      return {
+        'valid': false,
+        'error': 'Stored documents count cannot be negative',
+      };
+    }
+    if (totalStorageUsedMb < 0.0) {
+      return {
+        'valid': false,
+        'error': 'Total storage used cannot be negative',
+      };
+    }
+
+    final double usagePct = (totalStorageUsedMb / maxStorageQuotaMb * 100).clamp(0.0, 100.0);
+    final bool isQuotaExceeded = totalStorageUsedMb > maxStorageQuotaMb;
+
+    String storageStatusTier = 'OPTIMAL_STORAGE';
+    if (isQuotaExceeded) {
+      storageStatusTier = 'QUOTA_EXCEEDED';
+    } else if (usagePct >= 85.0) {
+      storageStatusTier = 'NEAR_CAPACITY';
+    }
+
+    return {
+      'valid': true,
+      'storedDocumentsCount': storedDocumentsCount,
+      'totalStorageUsedMb': double.parse(totalStorageUsedMb.toStringAsFixed(2)),
+      'maxStorageQuotaMb': double.parse(maxStorageQuotaMb.toStringAsFixed(2)),
+      'retentionYearsRequired': retentionYearsRequired,
+      'usagePercentage': double.parse(usagePct.toStringAsFixed(1)),
+      'isQuotaExceeded': isQuotaExceeded,
+      'storageStatusTier': storageStatusTier,
+      'recommendation': isQuotaExceeded
+          ? 'Storage limit exceeded. Upgrade cloud storage tier to preserve required statutory 7-year notary document archive.'
+          : 'Document retention storage within safe capacity ($storedDocumentsCount documents archived).',
+    };
+  }
 }
+
 
 
