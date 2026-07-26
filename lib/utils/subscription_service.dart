@@ -1232,7 +1232,59 @@ class SubscriptionService {
           : 'High fraud risk detected ($fraudRiskScore/100). Require second form of identification.',
     };
   }
+
+  /// Calculates overall notary compliance audit report summary and state audit readiness score
+  static Map<String, dynamic> calculateNotaryComplianceAuditReportSummary({
+    int totalJournalsRecorded = 10,
+    int missingSignaturesCount = 0,
+    bool isErrorsAndOmissionsInsured = true,
+    bool isSuretyBondActive = true,
+    double auditCompletenessRatio = 1.0,
+  }) {
+    if (totalJournalsRecorded <= 0) {
+      return {
+        'valid': false,
+        'error': 'Total journals recorded must be greater than zero',
+      };
+    }
+
+    final sigErrors = missingSignaturesCount < 0 ? 0 : missingSignaturesCount;
+    final ratio = auditCompletenessRatio.clamp(0.0, 1.0);
+
+    double score = ratio * 60.0;
+    if (isErrorsAndOmissionsInsured) score += 20.0;
+    if (isSuretyBondActive) score += 20.0;
+
+    final missingPenalty = (sigErrors / totalJournalsRecorded) * 30.0;
+    score = (score - missingPenalty).clamp(0.0, 100.0);
+
+    final finalScore = double.parse(score.toStringAsFixed(1));
+    final bool isAuditReady = finalScore >= 80.0 && isSuretyBondActive;
+
+    String auditStatusTier = 'AUDIT_READY';
+    if (finalScore < 50.0) {
+      auditStatusTier = 'NON_COMPLIANT';
+    } else if (finalScore < 80.0) {
+      auditStatusTier = 'NEEDS_REVISION';
+    }
+
+    return {
+      'valid': true,
+      'totalJournalsRecorded': totalJournalsRecorded,
+      'missingSignaturesCount': sigErrors,
+      'isErrorsAndOmissionsInsured': isErrorsAndOmissionsInsured,
+      'isSuretyBondActive': isSuretyBondActive,
+      'auditCompletenessRatio': ratio,
+      'auditScore': finalScore,
+      'isAuditReady': isAuditReady,
+      'auditStatusTier': auditStatusTier,
+      'recommendation': isAuditReady
+          ? 'Notary business journal and insurance status are fully compliant and state audit-ready.'
+          : 'Resolve missing journal signatures and renew surety bond/insurance before state inspection.',
+    };
+  }
 }
+
 
 
 
