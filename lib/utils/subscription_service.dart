@@ -1283,7 +1283,47 @@ class SubscriptionService {
           : 'Resolve missing journal signatures and renew surety bond/insurance before state inspection.',
     };
   }
+
+  /// Calculates notary annual tax deduction, mileage reimbursement, and net taxable income report
+  static Map<String, dynamic> calculateNotaryAnnualTaxDeductionAndMileageReport({
+    required double totalBusinessMiles,
+    required double totalGrossNotaryFeesUsd,
+    required double softwareAndSuppliesExpenseUsd,
+    double mileageDeductionRateUsd = 0.67,
+    double homeOfficeDeductionUsd = 0.0,
+  }) {
+    if (totalBusinessMiles < 0 || totalGrossNotaryFeesUsd < 0 || softwareAndSuppliesExpenseUsd < 0) {
+      return {
+        'valid': false,
+        'error': 'Miles, fees, and expenses cannot be negative',
+      };
+    }
+
+    final double totalMileageDeduction = totalBusinessMiles * mileageDeductionRateUsd;
+    final double totalDeductions = totalMileageDeduction + softwareAndSuppliesExpenseUsd + homeOfficeDeductionUsd;
+    final double netTaxableIncome = (totalGrossNotaryFeesUsd - totalDeductions).clamp(0.0, double.infinity);
+    final double deductionPercentage = totalGrossNotaryFeesUsd > 0
+        ? ((totalDeductions / totalGrossNotaryFeesUsd) * 100).clamp(0.0, 100.0)
+        : 0.0;
+
+    return {
+      'valid': true,
+      'totalBusinessMiles': totalBusinessMiles,
+      'totalGrossNotaryFeesUsd': totalGrossNotaryFeesUsd,
+      'mileageDeductionRateUsd': mileageDeductionRateUsd,
+      'totalMileageDeductionUsd': double.parse(totalMileageDeduction.toStringAsFixed(2)),
+      'softwareAndSuppliesExpenseUsd': softwareAndSuppliesExpenseUsd,
+      'homeOfficeDeductionUsd': homeOfficeDeductionUsd,
+      'totalDeductionsUsd': double.parse(totalDeductions.toStringAsFixed(2)),
+      'netTaxableIncomeUsd': double.parse(netTaxableIncome.toStringAsFixed(2)),
+      'deductionPercentage': double.parse(deductionPercentage.toStringAsFixed(1)),
+      'recommendation': netTaxableIncome > 0
+          ? 'Tax report calculated successfully. Total deductions offset \$${totalDeductions.toStringAsFixed(2)} of gross notary income.'
+          : 'Deductions fully offset gross notary income for the tax year.',
+    };
+  }
 }
+
 
 
 

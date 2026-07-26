@@ -219,8 +219,24 @@ void main() {
       expect(result['isAuthentic'], isTrue);
       expect(result['recommendation'], contains('verified successfully'));
     });
+
+    test('validates annual notary tax deduction and mileage reimbursement report', () {
+      final report = SubscriptionService.calculateNotaryAnnualTaxDeductionAndMileageReport(
+        totalBusinessMiles: 1000.0,
+        totalGrossNotaryFeesUsd: 5000.0,
+        softwareAndSuppliesExpenseUsd: 500.0,
+        mileageDeductionRateUsd: 0.67,
+        homeOfficeDeductionUsd: 300.0,
+      );
+      expect(report['valid'], isTrue);
+      expect(report['totalMileageDeductionUsd'], equals(670.0));
+      expect(report['totalDeductionsUsd'], equals(1470.0));
+      expect(report['netTaxableIncomeUsd'], equals(3530.0));
+      expect(report['deductionPercentage'], equals(29.4));
+    });
   });
 }
+
 
 
 
