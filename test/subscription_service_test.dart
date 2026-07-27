@@ -35,4 +35,32 @@ void main() {
       expect(res['error'], contains('Appointments count and total time must be positive'));
     });
   });
+
+  group('SubscriptionService - Annual License Renewal Audit', () => {
+    test('evaluates fully compliant notary license audit correctly', () => {
+      final res = SubscriptionService.calculateNotaryAnnualLicenseRenewalAudit(
+        commissionExpirationDateStr: '2028-12-31',
+        requiredBondAmountUsd: 10000.0,
+        activeBondAmountUsd: 10000.0,
+        eAndOInsuranceCoverageUsd: 25000.0,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['isBondCompliant'], equals(true));
+      expect(res['isInsuranceActive'], equals(true));
+      expect(res['isCommissionValid'], equals(true));
+      expect(res['complianceTier'], equals('FULLY_COMPLIANT'));
+      expect(res['isFullyCompliant'], equals(true));
+    });
+
+    test('returns invalid for empty commission date string', () => {
+      final res = SubscriptionService.calculateNotaryAnnualLicenseRenewalAudit(
+        commissionExpirationDateStr: '',
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], contains('Commission expiration date and required bond amount are required'));
+    });
+  });
 }
+

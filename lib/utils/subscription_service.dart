@@ -1413,5 +1413,59 @@ class SubscriptionService {
           : 'Batch expenses exceed total fees; optimize trip routing or increase signing fees.',
     };
   }
+
+  /// Calculates notary annual license, bond, and E&O insurance compliance status
+  static Map<String, dynamic> calculateNotaryAnnualLicenseRenewalAudit({
+    required String commissionExpirationDateStr,
+    double requiredBondAmountUsd = 10000.0,
+    double activeBondAmountUsd = 10000.0,
+    double eAndOInsuranceCoverageUsd = 25000.0,
+  }) {
+    if (commissionExpirationDateStr.isEmpty || requiredBondAmountUsd <= 0) {
+      return {
+        'valid': false,
+        'error': 'Commission expiration date and required bond amount are required',
+      };
+    }
+
+    DateTime? expiryDate;
+    try {
+      expiryDate = DateTime.parse(commissionExpirationDateStr);
+    } catch (_) {
+      return {
+        'valid': false,
+        'error': 'Invalid date format for commission expiration date',
+      };
+    }
+
+    final int daysUntilExpiration = expiryDate.difference(DateTime.now()).inDays;
+    final bool isBondCompliant = activeBondAmountUsd >= requiredBondAmountUsd;
+    final bool isInsuranceActive = eAndOInsuranceCoverageUsd >= 10000.0;
+    final bool isCommissionValid = daysUntilExpiration > 0;
+
+    String complianceTier = 'FULLY_COMPLIANT';
+    if (!isCommissionValid || !isBondCompliant) {
+      complianceTier = 'NON_COMPLIANT';
+    } else if (daysUntilExpiration <= 60 || !isInsuranceActive) {
+      complianceTier = 'RENEWAL_ACTION_REQUIRED';
+    }
+
+    return {
+      'valid': true,
+      'commissionExpirationDate': commissionExpirationDateStr,
+      'daysUntilExpiration': daysUntilExpiration,
+      'isBondCompliant': isBondCompliant,
+      'isInsuranceActive': isInsuranceActive,
+      'isCommissionValid': isCommissionValid,
+      'complianceTier': complianceTier,
+      'isFullyCompliant': complianceTier == 'FULLY_COMPLIANT',
+      'recommendation': complianceTier == 'FULLY_COMPLIANT'
+          ? 'Notary commission, bond, and insurance are fully active and compliant ($daysUntilExpiration days remaining).'
+          : complianceTier == 'RENEWAL_ACTION_REQUIRED'
+          ? 'Commission renewal or insurance boost required within $daysUntilExpiration days.'
+          : 'CRITICAL: Notary commission expired or bond amount non-compliant; suspend signing activity until renewed.',
+    };
+  }
 }
+
 
