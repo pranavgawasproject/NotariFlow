@@ -1366,4 +1366,52 @@ class SubscriptionService {
           : 'Appointment expenses exceed signing fee; consider negotiating a higher fee or travel fee surcharge.',
     };
   }
+
+  /// Calculates loan signing batch appointment profitability and travel route optimization
+  static Map<String, dynamic> calculateNotaryLoanSigningBatchProfitability({
+    required int totalAppointmentsCount,
+    required double totalGrossFeesUsd,
+    required double totalRoundTripMiles,
+    required double totalPrintingPaperCostUsd,
+    double mileageRateUsd = 0.67,
+    double totalTimeHours = 4.0,
+  }) {
+    if (totalAppointmentsCount <= 0 || totalGrossFeesUsd < 0 || totalRoundTripMiles < 0 || totalTimeHours <= 0) {
+      return {
+        'valid': false,
+        'error': 'Appointments count and total time must be positive, and fees/miles non-negative',
+      };
+    }
+
+    final double totalTravelCostUsd = totalRoundTripMiles * mileageRateUsd;
+    final double totalExpensesUsd = totalTravelCostUsd + totalPrintingPaperCostUsd;
+    final double netBatchProfitUsd = totalGrossFeesUsd - totalExpensesUsd;
+    final double netHourlyRateUsd = netBatchProfitUsd / totalTimeHours;
+    final double averageProfitPerSigningUsd = netBatchProfitUsd / totalAppointmentsCount;
+
+    String batchEfficiencyTier = 'HIGHLY_EFFICIENT_BATCH';
+    if (netBatchProfitUsd <= 0) {
+      batchEfficiencyTier = 'UNPROFITABLE_BATCH';
+    } else if (netHourlyRateUsd < 45.0) {
+      batchEfficiencyTier = 'MODERATE_EFFICIENCY';
+    }
+
+    return {
+      'valid': true,
+      'totalAppointmentsCount': totalAppointmentsCount,
+      'totalGrossFeesUsd': totalGrossFeesUsd,
+      'totalRoundTripMiles': totalRoundTripMiles,
+      'totalTravelCostUsd': double.parse(totalTravelCostUsd.toStringAsFixed(2)),
+      'totalExpensesUsd': double.parse(totalExpensesUsd.toStringAsFixed(2)),
+      'netBatchProfitUsd': double.parse(netBatchProfitUsd.toStringAsFixed(2)),
+      'netHourlyRateUsd': double.parse(netHourlyRateUsd.toStringAsFixed(2)),
+      'averageProfitPerSigningUsd': double.parse(averageProfitPerSigningUsd.toStringAsFixed(2)),
+      'batchEfficiencyTier': batchEfficiencyTier,
+      'isBatchProfitable': netBatchProfitUsd > 0,
+      'recommendation': netBatchProfitUsd > 0
+          ? 'Batch signing schedule is profitable (\$$netBatchProfitUsd net profit, \$$netHourlyRateUsd/hr).'
+          : 'Batch expenses exceed total fees; optimize trip routing or increase signing fees.',
+    };
+  }
 }
+
