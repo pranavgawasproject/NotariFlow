@@ -1322,12 +1322,48 @@ class SubscriptionService {
           : 'Deductions fully offset gross notary income for the tax year.',
     };
   }
+
+  /// Calculates travel trip profitability for mobile notary public signing agents
+  static Map<String, dynamic> calculateNotarySigningAgentTravelProfitability({
+    required double signingFeeUsd,
+    required double roundTripMiles,
+    required double printingAndPaperCostUsd,
+    double mileageExpenseRateUsd = 0.67,
+    double estimatedDurationHours = 1.5,
+  }) {
+    if (signingFeeUsd < 0 || roundTripMiles < 0 || printingAndPaperCostUsd < 0 || estimatedDurationHours <= 0) {
+      return {
+        'valid': false,
+        'error': 'Signing fee, miles, printing costs cannot be negative, and duration must be positive',
+      };
+    }
+
+    final double totalTravelCostUsd = roundTripMiles * mileageExpenseRateUsd;
+    final double totalExpensesUsd = totalTravelCostUsd + printingAndPaperCostUsd;
+    final double netProfitUsd = signingFeeUsd - totalExpensesUsd;
+    final double effectiveHourlyRateUsd = netProfitUsd / estimatedDurationHours;
+
+    String profitabilityTier = 'HIGH_PROFIT';
+    if (netProfitUsd <= 0) {
+      profitabilityTier = 'UNPROFITABLE';
+    } else if (effectiveHourlyRateUsd < 35.0) {
+      profitabilityTier = 'ACCEPTABLE_PROFIT';
+    }
+
+    return {
+      'valid': true,
+      'signingFeeUsd': signingFeeUsd,
+      'roundTripMiles': roundTripMiles,
+      'printingAndPaperCostUsd': printingAndPaperCostUsd,
+      'totalTravelCostUsd': double.parse(totalTravelCostUsd.toStringAsFixed(2)),
+      'totalExpensesUsd': double.parse(totalExpensesUsd.toStringAsFixed(2)),
+      'netProfitUsd': double.parse(netProfitUsd.toStringAsFixed(2)),
+      'effectiveHourlyRateUsd': double.parse(effectiveHourlyRateUsd.toStringAsFixed(2)),
+      'profitabilityTier': profitabilityTier,
+      'isProfitable': netProfitUsd > 0,
+      'recommendation': netProfitUsd > 0
+          ? 'Signing appointment is profitable (\$$netProfitUsd net profit, \$$effectiveHourlyRateUsd/hr).'
+          : 'Appointment expenses exceed signing fee; consider negotiating a higher fee or travel fee surcharge.',
+    };
+  }
 }
-
-
-
-
-
-
-
-

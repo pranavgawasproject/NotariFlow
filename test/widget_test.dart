@@ -234,6 +234,23 @@ void main() {
       expect(report['netTaxableIncomeUsd'], equals(3530.0));
       expect(report['deductionPercentage'], equals(29.4));
     });
+
+    test('validates notary signing agent travel profitability calculation', () {
+      final result = SubscriptionService.calculateNotarySigningAgentTravelProfitability(
+        signingFeeUsd: 150.0,
+        roundTripMiles: 40.0,
+        printingAndPaperCostUsd: 15.0,
+        mileageExpenseRateUsd: 0.67,
+        estimatedDurationHours: 2.0,
+      );
+      expect(result['valid'], isTrue);
+      expect(result['totalTravelCostUsd'], equals(26.8));
+      expect(result['totalExpensesUsd'], equals(41.8));
+      expect(result['netProfitUsd'], equals(108.2));
+      expect(result['effectiveHourlyRateUsd'], equals(54.1));
+      expect(result['profitabilityTier'], equals('HIGH_PROFIT'));
+      expect(result['isProfitable'], isTrue);
+    });
   });
 }
 
