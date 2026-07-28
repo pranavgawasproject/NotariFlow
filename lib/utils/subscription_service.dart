@@ -1505,7 +1505,58 @@ class SubscriptionService {
           : 'Underinsured risk! Current \$${currentPolicyCoverageUsd.toStringAsFixed(0)} coverage is below recommended \$${recommendedCoverageUsd.toStringAsFixed(0)} for $monthlyLoanSigningsCount loan signings/month.'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryComplianceAndAuditReadiness({
+    int completedJournalEntries = 20,
+    int missingSignaturesCount = 0,
+    bool isEoInsuranceActive = true,
+    bool isCommissionActive = true,
+    bool isStateFeeCapCompliant = true,
+  }) {
+    if (completedJournalEntries < 0) {
+      return {'valid': false, 'error': 'Completed journal entries must be a non-negative number'};
+    }
+
+    int score = 0;
+    if (isCommissionActive) score += 35;
+    if (isEoInsuranceActive) score += 25;
+    if (isStateFeeCapCompliant) score += 20;
+
+    if (completedJournalEntries > 0) {
+      final double signatureRatio = (completedJournalEntries - missingSignaturesCount).clamp(0, completedJournalEntries) / completedJournalEntries;
+      score += (signatureRatio * 20).round();
+    } else {
+      score += 20;
+    }
+
+    score = score.clamp(0, 100);
+
+    String readinessTier = 'STATE_AUDIT_READY';
+    if (!isCommissionActive || score < 50) {
+      readinessTier = 'NON_COMPLIANT_HIGH_RISK';
+    } else if (score < 80) {
+      readinessTier = 'MODERATE_COMPLIANCE_RISK';
+    }
+
+    return {
+      'valid': true,
+      'completedJournalEntries': completedJournalEntries,
+      'missingSignaturesCount': missingSignaturesCount,
+      'isEoInsuranceActive': isEoInsuranceActive,
+      'isCommissionActive': isCommissionActive,
+      'isStateFeeCapCompliant': isStateFeeCapCompliant,
+      'auditReadinessScore': score,
+      'readinessTier': readinessTier,
+      'isAuditReady': readinessTier == 'STATE_AUDIT_READY',
+      'recommendation': readinessTier == 'STATE_AUDIT_READY'
+          ? 'Notary records and active credentials achieve full state audit readiness ($score/100 score).'
+          : readinessTier == 'MODERATE_COMPLIANCE_RISK'
+          ? 'Moderate compliance risk ($score/100 score). Complete missing journal signatures and verify state fee limits.'
+          : 'CRITICAL COMPLIANCE ALERT ($score/100 score). Suspend notary acts until commission and E&O credentials are verified.'
+    };
+  }
 }
+
 
 
 

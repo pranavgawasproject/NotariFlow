@@ -85,6 +85,45 @@ void main() {
       expect(res['error'], equals('Policy coverage must be a positive number'));
     });
   });
+
+  group('calculateNotaryComplianceAndAuditReadiness', () {
+    test('calculates state audit ready tier for fully compliant notary', () {
+      final res = SubscriptionService.calculateNotaryComplianceAndAuditReadiness(
+        completedJournalEntries: 20,
+        missingSignaturesCount: 0,
+        isEoInsuranceActive: true,
+        isCommissionActive: true,
+        isStateFeeCapCompliant: true,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['auditReadinessScore'], equals(100));
+      expect(res['readinessTier'], equals('STATE_AUDIT_READY'));
+      expect(res['isAuditReady'], equals(true));
+      expect(res['recommendation'], contains('Notary records and active credentials achieve full state audit readiness'));
+    });
+
+    test('returns non-compliant high risk when commission is inactive', () {
+      final res = SubscriptionService.calculateNotaryComplianceAndAuditReadiness(
+        isCommissionActive: false,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['readinessTier'], equals('NON_COMPLIANT_HIGH_RISK'));
+      expect(res['isAuditReady'], equals(false));
+      expect(res['recommendation'], contains('CRITICAL COMPLIANCE ALERT'));
+    });
+
+    test('returns error for negative journal entries', () {
+      final res = SubscriptionService.calculateNotaryComplianceAndAuditReadiness(
+        completedJournalEntries: -5,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Completed journal entries must be a non-negative number'));
+    });
+  });
 }
+
 
 
