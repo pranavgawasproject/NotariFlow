@@ -62,5 +62,29 @@ void main() {
       expect(res['error'], contains('Commission expiration date and required bond amount are required'));
     });
   });
+
+  group('SubscriptionService - Errors & Omissions Insurance Audit', () => {
+    test('calculates adequate E&O coverage for standard volume', () => {
+      final res = SubscriptionService.calculateNotaryErrorsAndOmissionsInsuranceAudit(
+        currentPolicyCoverageUsd: 50000.0,
+        monthlyLoanSigningsCount: 10,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['isCoverageAdequate'], equals(true));
+      expect(res['auditScore'], equals(100));
+      expect(res['coverageTier'], equals('ADEQUATE_EO_COVERAGE'));
+    });
+
+    test('returns invalid for non-positive policy coverage', () => {
+      final res = SubscriptionService.calculateNotaryErrorsAndOmissionsInsuranceAudit(
+        currentPolicyCoverageUsd: 0.0,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Policy coverage must be a positive number'));
+    });
+  });
 }
+
 

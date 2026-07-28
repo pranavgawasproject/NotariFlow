@@ -1466,6 +1466,46 @@ class SubscriptionService {
           : 'CRITICAL: Notary commission expired or bond amount non-compliant; suspend signing activity until renewed.',
     };
   }
+
+  static Map<String, dynamic> calculateNotaryErrorsAndOmissionsInsuranceAudit({
+    double currentPolicyCoverageUsd = 25000,
+    int monthlyLoanSigningsCount = 10,
+    double averageLoanAmountUsd = 300000,
+  }) {
+    if (currentPolicyCoverageUsd <= 0) {
+      return {'valid': false, 'error': 'Policy coverage must be a positive number'};
+    }
+
+    final double recommendedCoverageUsd = monthlyLoanSigningsCount >= 20
+        ? 100000.0
+        : (monthlyLoanSigningsCount >= 10 ? 50000.0 : 25000.0);
+
+    final bool isCoverageAdequate = currentPolicyCoverageUsd >= recommendedCoverageUsd;
+    final int auditScore = isCoverageAdequate
+        ? 100
+        : ((currentPolicyCoverageUsd / recommendedCoverageUsd) * 100).round();
+
+    String coverageTier = 'ADEQUATE_EO_COVERAGE';
+    if (auditScore < 50) {
+      coverageTier = 'CRITICAL_EO_UNDERINSURED';
+    } else if (auditScore < 100) {
+      coverageTier = 'RECOMMEND_EO_UPGRADE';
+    }
+
+    return {
+      'valid': true,
+      'currentPolicyCoverageUsd': currentPolicyCoverageUsd,
+      'recommendedCoverageUsd': recommendedCoverageUsd,
+      'monthlyLoanSigningsCount': monthlyLoanSigningsCount,
+      'isCoverageAdequate': isCoverageAdequate,
+      'auditScore': auditScore,
+      'coverageTier': coverageTier,
+      'recommendation': isCoverageAdequate
+          ? 'E&O Insurance coverage of \$${currentPolicyCoverageUsd.toStringAsFixed(0)} is optimal for $monthlyLoanSigningsCount loan signings/month.'
+          : 'Underinsured risk! Current \$${currentPolicyCoverageUsd.toStringAsFixed(0)} coverage is below recommended \$${recommendedCoverageUsd.toStringAsFixed(0)} for $monthlyLoanSigningsCount loan signings/month.'
+    };
+  }
 }
+
 
 
