@@ -1555,7 +1555,55 @@ class SubscriptionService {
           : 'CRITICAL COMPLIANCE ALERT ($score/100 score). Suspend notary acts until commission and E&O credentials are verified.'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryJournalEntryIntegrityAudit({
+    int totalEntries = 50,
+    int missingIdTypeCount = 0,
+    int missingThumbprintCount = 0,
+    int unverifiedSignerCount = 0,
+    bool hasDigitalBackup = true,
+  }) {
+    if (totalEntries <= 0) {
+      return {'valid': false, 'error': 'Total entries must be a positive number'};
+    }
+
+    final int missingId = missingIdTypeCount.clamp(0, totalEntries);
+    final int missingThumb = missingThumbprintCount.clamp(0, totalEntries);
+    final int unverified = unverifiedSignerCount.clamp(0, totalEntries);
+
+    double idScore = ((totalEntries - missingId) / totalEntries) * 35;
+    double thumbScore = ((totalEntries - missingThumb) / totalEntries) * 25;
+    double signerScore = ((totalEntries - unverified) / totalEntries) * 25;
+    double backupScore = hasDigitalBackup ? 15.0 : 0.0;
+
+    int totalIntegrityScore = (idScore + thumbScore + signerScore + backupScore).round().clamp(0, 100);
+
+    String auditTier = 'STATE_COMPLIANT_JOURNAL';
+    if (totalIntegrityScore < 60 || unverified > 0) {
+      auditTier = 'HIGH_LEGAL_EXPOSURE';
+    } else if (totalIntegrityScore < 85) {
+      auditTier = 'MINOR_DOCUMENTATION_GAPS';
+    }
+
+    return {
+      'valid': true,
+      'totalEntries': totalEntries,
+      'missingIdTypeCount': missingId,
+      'missingThumbprintCount': missingThumb,
+      'unverifiedSignerCount': unverified,
+      'hasDigitalBackup': hasDigitalBackup,
+      'totalIntegrityScore': totalIntegrityScore,
+      'auditTier': auditTier,
+      'isJournalAuditPassed': auditTier == 'STATE_COMPLIANT_JOURNAL',
+      'recommendation': auditTier == 'STATE_COMPLIANT_JOURNAL'
+          ? 'Notary journal entries maintain 100% legal compliance and state audit readiness ($totalIntegrityScore/100 score).'
+          : auditTier == 'MINOR_DOCUMENTATION_GAPS'
+          ? 'Minor documentation gaps ($totalIntegrityScore/100 score). Complete missing ID details and thumbprints.'
+          : 'HIGH LEGAL EXPOSURE ($totalIntegrityScore/100 score). Unverified signers or missing mandatory ID entries detected.'
+    };
+  }
 }
+
 
 
 

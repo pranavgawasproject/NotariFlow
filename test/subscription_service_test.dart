@@ -123,7 +123,35 @@ void main() {
       expect(res['error'], equals('Completed journal entries must be a non-negative number'));
     });
   });
+
+  group('calculateNotaryJournalEntryIntegrityAudit', () {
+    test('calculates state compliant journal tier for complete entries', () {
+      final res = SubscriptionService.calculateNotaryJournalEntryIntegrityAudit(
+        totalEntries: 50,
+        missingIdTypeCount: 0,
+        missingThumbprintCount: 0,
+        unverifiedSignerCount: 0,
+        hasDigitalBackup: true,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['totalIntegrityScore'], equals(100));
+      expect(res['auditTier'], equals('STATE_COMPLIANT_JOURNAL'));
+      expect(res['isJournalAuditPassed'], equals(true));
+      expect(res['recommendation'], contains('Notary journal entries maintain 100% legal compliance'));
+    });
+
+    test('returns error for non-positive total entries', () {
+      final res = SubscriptionService.calculateNotaryJournalEntryIntegrityAudit(
+        totalEntries: 0,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Total entries must be a positive number'));
+    });
+  });
 }
+
 
 
 
