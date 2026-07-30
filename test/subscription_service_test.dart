@@ -179,7 +179,51 @@ void main() {
       expect(res['error'], equals('Percentage scores cannot be negative'));
     });
   });
+
+  group('calculateNotaryDocumentIdentityVerificationAuditScore', () {
+    test('calculates IDENTITY_VERIFIED_SECURE tier for valid ID and high biometric/KBA scores', () {
+      final res = SubscriptionService.calculateNotaryDocumentIdentityVerificationAuditScore(
+        hasGovernmentIdScanned: true,
+        idExpiryCheckPassed: true,
+        biometricFacialMatchScore: 95.0,
+        kbaScore: 90.0,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['identityVerificationScore'], equals(96));
+      expect(res['auditTier'], equals('IDENTITY_VERIFIED_SECURE'));
+      expect(res['isIdentityVerified'], equals(true));
+      expect(res['recommendation'], contains('Signer identity verified securely'));
+    });
+
+    test('returns FAILED_IDENTITY_AUDIT when ID check fails or is missing', () {
+      final res = SubscriptionService.calculateNotaryDocumentIdentityVerificationAuditScore(
+        hasGovernmentIdScanned: false,
+        idExpiryCheckPassed: false,
+        biometricFacialMatchScore: 50.0,
+        kbaScore: 50.0,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['auditTier'], equals('FAILED_IDENTITY_AUDIT'));
+      expect(res['isIdentityVerified'], equals(false));
+      expect(res['recommendation'], contains('FAILED IDENTITY AUDIT'));
+    });
+
+    test('returns error for negative scores', () {
+      final res = SubscriptionService.calculateNotaryDocumentIdentityVerificationAuditScore(
+        hasGovernmentIdScanned: true,
+        idExpiryCheckPassed: true,
+        biometricFacialMatchScore: -5.0,
+        kbaScore: 90.0,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Scores cannot be negative'));
+    });
+  });
 }
+
 
 
 

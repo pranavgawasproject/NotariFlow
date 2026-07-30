@@ -1648,7 +1648,52 @@ class SubscriptionService {
           : 'RON NON-COMPLIANT: Video recording archival or digital tamper-evident seal missing.'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryDocumentIdentityVerificationAuditScore({
+    required bool hasGovernmentIdScanned,
+    required bool idExpiryCheckPassed,
+    required double biometricFacialMatchScore,
+    required double kbaScore,
+  }) {
+    if (biometricFacialMatchScore < 0 || kbaScore < 0) {
+      return {'valid': false, 'error': 'Scores cannot be negative'};
+    }
+
+    double score = 0;
+    if (hasGovernmentIdScanned) score += 25;
+    if (idExpiryCheckPassed) score += 25;
+    score += (biometricFacialMatchScore.clamp(0.0, 100.0) * 0.25);
+    score += (kbaScore.clamp(0.0, 100.0) * 0.25);
+
+    int totalIdentityScore = score.round().clamp(0, 100);
+
+    String auditTier = 'IDENTITY_VERIFIED_SECURE';
+    if (!hasGovernmentIdScanned || !idExpiryCheckPassed || totalIdentityScore < 60) {
+      auditTier = 'FAILED_IDENTITY_AUDIT';
+    } else if (totalIdentityScore < 85) {
+      auditTier = 'MODERATE_IDENTITY_CONFIRMATION';
+    }
+
+    final bool isIdentityVerified = auditTier == 'IDENTITY_VERIFIED_SECURE';
+
+    return {
+      'valid': true,
+      'hasGovernmentIdScanned': hasGovernmentIdScanned,
+      'idExpiryCheckPassed': idExpiryCheckPassed,
+      'biometricFacialMatchScore': biometricFacialMatchScore,
+      'kbaScore': kbaScore,
+      'identityVerificationScore': totalIdentityScore,
+      'auditTier': auditTier,
+      'isIdentityVerified': isIdentityVerified,
+      'recommendation': isIdentityVerified
+          ? 'Signer identity verified securely ($totalIdentityScore/100 score, valid ID and biometric match).'
+          : auditTier == 'MODERATE_IDENTITY_CONFIRMATION'
+          ? 'Moderate identity verification ($totalIdentityScore/100 score). Secondary ID verification recommended.'
+          : 'FAILED IDENTITY AUDIT: Expired/missing ID or insufficient biometric/KBA match score.'
+    };
+  }
 }
+
 
 
 
