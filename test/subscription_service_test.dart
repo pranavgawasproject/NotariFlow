@@ -150,7 +150,37 @@ void main() {
       expect(res['error'], equals('Total entries must be a positive number'));
     });
   });
+
+  group('calculateNotaryRemoteOnlineNotarizationSessionSecurityScore', () {
+    test('calculates SECURE_RON_SESSION_VERIFIED tier for full video archive and high KBA score', () {
+      final res = SubscriptionService.calculateNotaryRemoteOnlineNotarizationSessionSecurityScore(
+        isVideoSessionRecordedAndArchived: true,
+        kbaPassPercentage: 100.0,
+        isTamperEvidentDigitalSealApplied: true,
+        idCredentialAnalysisScore: 95.0,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['totalRonSecurityScore'], equals(99));
+      expect(res['ronComplianceTier'], equals('SECURE_RON_SESSION_VERIFIED'));
+      expect(res['isRonCompliant'], equals(true));
+      expect(res['recommendation'], contains('Remote Online Notarization (RON) session complies cleanly'));
+    });
+
+    test('returns error for negative percentage scores', () {
+      final res = SubscriptionService.calculateNotaryRemoteOnlineNotarizationSessionSecurityScore(
+        isVideoSessionRecordedAndArchived: true,
+        kbaPassPercentage: -10.0,
+        isTamperEvidentDigitalSealApplied: true,
+        idCredentialAnalysisScore: 90.0,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Percentage scores cannot be negative'));
+    });
+  });
 }
+
 
 
 

@@ -1602,7 +1602,54 @@ class SubscriptionService {
           : 'HIGH LEGAL EXPOSURE ($totalIntegrityScore/100 score). Unverified signers or missing mandatory ID entries detected.'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryRemoteOnlineNotarizationSessionSecurityScore({
+    required bool isVideoSessionRecordedAndArchived,
+    required double kbaPassPercentage,
+    required bool isTamperEvidentDigitalSealApplied,
+    required double idCredentialAnalysisScore,
+    bool isAudioVideoLatencyOptimal = true,
+  }) {
+    if (kbaPassPercentage < 0 || idCredentialAnalysisScore < 0) {
+      return {'valid': false, 'error': 'Percentage scores cannot be negative'};
+    }
+
+    double score = 0;
+    if (isVideoSessionRecordedAndArchived) score += 35;
+    score += (kbaPassPercentage.clamp(0.0, 100.0) * 0.25);
+    if (isTamperEvidentDigitalSealApplied) score += 25;
+    score += (idCredentialAnalysisScore.clamp(0.0, 100.0) * 0.15);
+
+    int totalRonSecurityScore = score.round().clamp(0, 100);
+
+    String ronComplianceTier = 'SECURE_RON_SESSION_VERIFIED';
+    if (totalRonSecurityScore < 60 || !isVideoSessionRecordedAndArchived || !isTamperEvidentDigitalSealApplied) {
+      ronComplianceTier = 'RON_NON_COMPLIANT_REJECTED';
+    } else if (totalRonSecurityScore < 85) {
+      ronComplianceTier = 'MODERATE_SECURITY_AUDIT_WARNING';
+    }
+
+    final bool isRonCompliant = ronComplianceTier == 'SECURE_RON_SESSION_VERIFIED';
+
+    return {
+      'valid': true,
+      'isVideoSessionRecordedAndArchived': isVideoSessionRecordedAndArchived,
+      'kbaPassPercentage': kbaPassPercentage,
+      'isTamperEvidentDigitalSealApplied': isTamperEvidentDigitalSealApplied,
+      'idCredentialAnalysisScore': idCredentialAnalysisScore,
+      'isAudioVideoLatencyOptimal': isAudioVideoLatencyOptimal,
+      'totalRonSecurityScore': totalRonSecurityScore,
+      'ronComplianceTier': ronComplianceTier,
+      'isRonCompliant': isRonCompliant,
+      'recommendation': isRonCompliant
+          ? 'Remote Online Notarization (RON) session complies cleanly with state statutory guidelines ($totalRonSecurityScore/100 score).'
+          : ronComplianceTier == 'MODERATE_SECURITY_AUDIT_WARNING'
+          ? 'Moderate security warning ($totalRonSecurityScore/100 score). Ensure KBA and ID analysis meet maximum threshold.'
+          : 'RON NON-COMPLIANT: Video recording archival or digital tamper-evident seal missing.'
+    };
+  }
 }
+
 
 
 
