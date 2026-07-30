@@ -1692,7 +1692,49 @@ class SubscriptionService {
           : 'FAILED IDENTITY AUDIT: Expired/missing ID or insufficient biometric/KBA match score.'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryAuditLogIntegrityScore({
+    required bool hasTimestampProof,
+    required bool hasDigitalSignatureChain,
+    required bool hasTamperEvidentHash,
+    required int recordedEventsCount,
+  }) {
+    if (recordedEventsCount < 0) {
+      return {'valid': false, 'error': 'Recorded events count cannot be negative'};
+    }
+
+    int score = 0;
+    if (hasTimestampProof) score += 35;
+    if (hasDigitalSignatureChain) score += 35;
+    if (hasTamperEvidentHash) score += 30;
+
+    int totalIntegrityScore = score.clamp(0, 100);
+
+    String integrityTier = 'TAMPER_PROOF_AUDIT_LOG';
+    if (totalIntegrityScore < 50) {
+      integrityTier = 'COMPROMISED_AUDIT_LOG';
+    } else if (totalIntegrityScore < 80) {
+      integrityTier = 'STANDARD_AUDIT_LOG';
+    }
+
+    final bool isCompliant = totalIntegrityScore >= 80;
+
+    return {
+      'valid': true,
+      'hasTimestampProof': hasTimestampProof,
+      'hasDigitalSignatureChain': hasDigitalSignatureChain,
+      'hasTamperEvidentHash': hasTamperEvidentHash,
+      'recordedEventsCount': recordedEventsCount,
+      'totalIntegrityScore': totalIntegrityScore,
+      'integrityTier': integrityTier,
+      'isCompliant': isCompliant,
+      'recommendation': isCompliant
+          ? 'Cryptographic audit log integrity verified ($totalIntegrityScore/100 score across $recordedEventsCount recorded events).'
+          : 'Audit log lacks cryptographic seals or tamper-evident hash validation.'
+    };
+  }
 }
+
 
 
 

@@ -222,6 +222,34 @@ void main() {
       expect(res['error'], equals('Scores cannot be negative'));
     });
   });
+
+  group('calculateNotaryAuditLogIntegrityScore', () {
+    test('calculates tamper proof audit log score correctly', () {
+      final res = SubscriptionService.calculateNotaryAuditLogIntegrityScore(
+        hasTimestampProof: true,
+        hasDigitalSignatureChain: true,
+        hasTamperEvidentHash: true,
+        recordedEventsCount: 15,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['totalIntegrityScore'], equals(100));
+      expect(res['integrityTier'], equals('TAMPER_PROOF_AUDIT_LOG'));
+      expect(res['isCompliant'], equals(true));
+    });
+
+    test('returns error for negative recorded events count', () {
+      final res = SubscriptionService.calculateNotaryAuditLogIntegrityScore(
+        hasTimestampProof: true,
+        hasDigitalSignatureChain: true,
+        hasTamperEvidentHash: true,
+        recordedEventsCount: -3,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Recorded events count cannot be negative'));
+    });
+  });
 }
 
 
