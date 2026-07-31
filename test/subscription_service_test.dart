@@ -250,6 +250,34 @@ void main() {
       expect(res['error'], equals('Recorded events count cannot be negative'));
     });
   });
+
+  group('calculateNotarySigningSessionProfitabilityScore', () {
+    test('calculates signing session profitability and hourly yield correctly', () {
+      final res = SubscriptionService.calculateNotarySigningSessionProfitabilityScore(
+        totalFeeChargedUsd: 150.0,
+        roundTripMiles: 20.0,
+        mileageRateUsdPerMile: 0.67,
+        printAndTravelExpenseUsd: 10.0,
+        sessionDurationHours: 1.5,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['mileageDeductionUsd'], equals(13.4));
+      expect(res['totalExpensesUsd'], equals(23.4));
+      expect(res['netProfitUsd'], equals(126.6));
+      expect(res['netHourlyRateUsd'], equals(84.4));
+      expect(res['profitabilityTier'], equals('HIGH_MARGIN_SIGNING'));
+    });
+
+    test('returns error for zero total fee charged', () {
+      final res = SubscriptionService.calculateNotarySigningSessionProfitabilityScore(
+        totalFeeChargedUsd: 0.0,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Total fee charged must be greater than 0'));
+    });
+  });
 }
 
 

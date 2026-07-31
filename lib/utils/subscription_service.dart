@@ -1733,7 +1733,50 @@ class SubscriptionService {
           : 'Audit log lacks cryptographic seals or tamper-evident hash validation.'
     };
   }
+
+  /// Calculates notary signing appointment profitability, mileage reimbursement, and net hourly yield
+  static Map<String, dynamic> calculateNotarySigningSessionProfitabilityScore({
+    double totalFeeChargedUsd = 125.0,
+    double roundTripMiles = 25.0,
+    double mileageRateUsdPerMile = 0.67,
+    double printAndTravelExpenseUsd = 15.0,
+    double sessionDurationHours = 1.5,
+  }) {
+    if (totalFeeChargedUsd <= 0) {
+      return {'valid': false, 'error': 'Total fee charged must be greater than 0'};
+    }
+    if (sessionDurationHours <= 0) {
+      return {'valid': false, 'error': 'Session duration hours must be greater than 0'};
+    }
+
+    final double mileageDeductionUsd = roundTripMiles * mileageRateUsdPerMile;
+    final double totalExpensesUsd = printAndTravelExpenseUsd + mileageDeductionUsd;
+    final double netProfitUsd = totalFeeChargedUsd - totalExpensesUsd;
+    final double netHourlyRateUsd = netProfitUsd / sessionDurationHours;
+
+    String profitabilityTier = 'HIGH_MARGIN_SIGNING';
+    if (netHourlyRateUsd < 30.0) {
+      profitabilityTier = 'LOW_MARGIN_SIGNING';
+    } else if (netHourlyRateUsd < 60.0) {
+      profitabilityTier = 'STANDARD_MARGIN_SIGNING';
+    }
+
+    return {
+      'valid': true,
+      'totalFeeChargedUsd': totalFeeChargedUsd,
+      'roundTripMiles': roundTripMiles,
+      'mileageDeductionUsd': (mileageDeductionUsd * 100).round() / 100,
+      'totalExpensesUsd': (totalExpensesUsd * 100).round() / 100,
+      'netProfitUsd': (netProfitUsd * 100).round() / 100,
+      'netHourlyRateUsd': (netHourlyRateUsd * 100).round() / 100,
+      'profitabilityTier': profitabilityTier,
+      'recommendation': profitabilityTier == 'HIGH_MARGIN_SIGNING'
+          ? 'High-profit signing session (\$${(netHourlyRateUsd * 100).round() / 100}/hr net).'
+          : 'Low-margin signing (\$${(netHourlyRateUsd * 100).round() / 100}/hr net). Consider renegotiating signing fee or travel surcharge.'
+    };
+  }
 }
+
 
 
 
