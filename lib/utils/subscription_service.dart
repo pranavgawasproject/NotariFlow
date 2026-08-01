@@ -1775,7 +1775,51 @@ class SubscriptionService {
           : 'Low-margin signing (\$${(netHourlyRateUsd * 100).round() / 100}/hr net). Consider renegotiating signing fee or travel surcharge.'
     };
   }
+
+  /// Calculates signer Knowledge-Based Authentication (KBA) verification score and pass status
+  static Map<String, dynamic> calculateNotarySignerKbaVerificationScore({
+    required int totalQuestionsAsked,
+    required int correctAnswersCount,
+    required double timeTakenSeconds,
+    int maxAllowedTimeSeconds = 120,
+    int passingThresholdPercentage = 80,
+  }) {
+    if (totalQuestionsAsked <= 0) {
+      return {'valid': false, 'error': 'Total questions asked must be a positive number'};
+    }
+
+    final int correct = correctAnswersCount.clamp(0, totalQuestionsAsked);
+    final double passPct = (correct / totalQuestionsAsked) * 100;
+    final bool isTimeValid = timeTakenSeconds > 0 && timeTakenSeconds <= maxAllowedTimeSeconds;
+    final bool isScorePassed = passPct >= passingThresholdPercentage;
+
+    final bool isKbaPassed = isScorePassed && isTimeValid;
+
+    String kbaTier = 'KBA_VERIFICATION_PASSED';
+    if (!isTimeValid) {
+      kbaTier = 'KBA_TIMEOUT_EXCEEDED';
+    } else if (!isScorePassed) {
+      kbaTier = 'KBA_FAILED_INSUFFICIENT_SCORE';
+    }
+
+    return {
+      'valid': true,
+      'totalQuestionsAsked': totalQuestionsAsked,
+      'correctAnswersCount': correct,
+      'kbaPassPercentage': (passPct * 10).round() / 10,
+      'timeTakenSeconds': timeTakenSeconds,
+      'isTimeValid': isTimeValid,
+      'isKbaPassed': isKbaPassed,
+      'kbaTier': kbaTier,
+      'recommendation': isKbaPassed
+          ? 'Signer passed Knowledge-Based Authentication (KBA) cleanly (${(passPct * 10).round() / 10}% correct in ${timeTakenSeconds}s).'
+          : kbaTier == 'KBA_TIMEOUT_EXCEEDED'
+          ? 'KBA verification failed due to timeout (${timeTakenSeconds}s exceeds ${maxAllowedTimeSeconds}s limit).'
+          : 'KBA verification failed (${(passPct * 10).round() / 10}% score below ${passingThresholdPercentage}% threshold).'
+    };
+  }
 }
+
 
 
 

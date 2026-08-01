@@ -278,7 +278,35 @@ void main() {
       expect(res['error'], equals('Total fee charged must be greater than 0'));
     });
   });
+
+  group('calculateNotarySignerKbaVerificationScore', () {
+    test('calculates KBA verification score and pass status correctly', () {
+      final res = SubscriptionService.calculateNotarySignerKbaVerificationScore(
+        totalQuestionsAsked: 5,
+        correctAnswersCount: 4,
+        timeTakenSeconds: 45.0,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['kbaPassPercentage'], equals(80.0));
+      expect(res['isTimeValid'], equals(true));
+      expect(res['isKbaPassed'], equals(true));
+      expect(res['kbaTier'], equals('KBA_VERIFICATION_PASSED'));
+    });
+
+    test('returns error for non-positive total questions asked', () {
+      final res = SubscriptionService.calculateNotarySignerKbaVerificationScore(
+        totalQuestionsAsked: 0,
+        correctAnswersCount: 0,
+        timeTakenSeconds: 30.0,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Total questions asked must be a positive number'));
+    });
+  });
 }
+
 
 
 
