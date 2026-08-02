@@ -304,6 +304,31 @@ void main() {
       expect(res['valid'], equals(false));
       expect(res['error'], equals('Total questions asked must be a positive number'));
     });
+
+    test('calculateNotaryMileageAndExpenseTaxDeduction calculates mileage deduction and tax savings correctly', () {
+      final res = SubscriptionService.calculateNotaryMileageAndExpenseTaxDeduction(
+        roundTripMiles: 40.0,
+        irsStandardMileageRateUsd: 0.67,
+        parkingAndTollsUsd: 10.0,
+        notaryFeeEarnedUsd: 150.0,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['mileageDeductionUsd'], equals(26.8));
+      expect(res['totalExpenseDeductionUsd'], equals(36.8));
+      expect(res['estimatedTaxSavingsUsd'], equals(9.2));
+      expect(res['recommendation'], contains('Tax deduction calculated'));
+    });
+
+    test('calculateNotaryMileageAndExpenseTaxDeduction returns error for invalid miles or mileage rate', () {
+      final res = SubscriptionService.calculateNotaryMileageAndExpenseTaxDeduction(
+        roundTripMiles: -5.0,
+        irsStandardMileageRateUsd: 0.67,
+      );
+
+      expect(res['valid'], equals(false));
+      expect(res['error'], equals('Round trip miles must be a non-negative number'));
+    });
   });
 }
 

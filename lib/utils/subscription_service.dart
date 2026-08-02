@@ -1818,6 +1818,40 @@ class SubscriptionService {
           : 'KBA verification failed (${(passPct * 10).round() / 10}% score below ${passingThresholdPercentage}% threshold).'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryMileageAndExpenseTaxDeduction({
+    required double roundTripMiles,
+    required double irsStandardMileageRateUsd,
+    double parkingAndTollsUsd = 0.0,
+    double notaryFeeEarnedUsd = 100.0,
+    double estimatedTaxRatePct = 25.0,
+  }) {
+    if (roundTripMiles < 0) {
+      return {'valid': false, 'error': 'Round trip miles must be a non-negative number'};
+    }
+    if (irsStandardMileageRateUsd <= 0) {
+      return {'valid': false, 'error': 'IRS mileage rate must be a positive number'};
+    }
+
+    final double mileageDeductionUsd = (roundTripMiles * irsStandardMileageRateUsd * 100).round() / 100;
+    final double parkingTolls = parkingAndTollsUsd >= 0 ? parkingAndTollsUsd : 0.0;
+    final double totalExpenseDeductionUsd = ((mileageDeductionUsd + parkingTolls) * 100).round() / 100;
+    final double estimatedTaxSavingsUsd = ((totalExpenseDeductionUsd * (estimatedTaxRatePct / 100)) * 100).round() / 100;
+    final double netTaxableNotaryIncomeUsd = (notaryFeeEarnedUsd - totalExpenseDeductionUsd).clamp(0.0, double.infinity);
+
+    return {
+      'valid': true,
+      'roundTripMiles': roundTripMiles,
+      'irsStandardMileageRateUsd': irsStandardMileageRateUsd,
+      'mileageDeductionUsd': mileageDeductionUsd,
+      'parkingAndTollsUsd': parkingTolls,
+      'totalExpenseDeductionUsd': totalExpenseDeductionUsd,
+      'estimatedTaxSavingsUsd': estimatedTaxSavingsUsd,
+      'notaryFeeEarnedUsd': notaryFeeEarnedUsd,
+      'netTaxableNotaryIncomeUsd': (netTaxableNotaryIncomeUsd * 100).round() / 100,
+      'recommendation': 'Tax deduction calculated: \$' + totalExpenseDeductionUsd.toStringAsFixed(2) + ' for ' + roundTripMiles.toStringAsFixed(1) + ' miles travel (Estimated tax savings: \$' + estimatedTaxSavingsUsd.toStringAsFixed(2) + ').'
+    };
+  }
 }
 
 
