@@ -329,6 +329,26 @@ void main() {
       expect(res['valid'], equals(false));
       expect(res['error'], equals('Round trip miles must be a non-negative number'));
     });
+
+    test('calculateNotaryCommissionExpiryAndRenewalStatus evaluates active, renewal window, and expired tiers correctly', () {
+      final futureDate = DateTime.now().add(const Duration(days: 120));
+      final resActive = SubscriptionService.calculateNotaryCommissionExpiryAndRenewalStatus(
+        commissionExpiryDate: futureDate,
+      );
+      expect(resActive['valid'], equals(true));
+      expect(resActive['isExpired'], equals(false));
+      expect(resActive['isRenewalWindowOpen'], equals(false));
+      expect(resActive['statusTier'], equals('COMMISSION_ACTIVE_VALID'));
+
+      final expiredDate = DateTime.now().subtract(const Duration(days: 10));
+      final resExpired = SubscriptionService.calculateNotaryCommissionExpiryAndRenewalStatus(
+        commissionExpiryDate: expiredDate,
+      );
+      expect(resExpired['valid'], equals(true));
+      expect(resExpired['isExpired'], equals(true));
+      expect(resExpired['statusTier'], equals('COMMISSION_EXPIRED_RENEWAL_REQUIRED'));
+      expect(resExpired['recommendation'], contains('COMMISSION EXPIRED'));
+    });
   });
 }
 

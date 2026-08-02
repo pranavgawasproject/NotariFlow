@@ -1852,6 +1852,42 @@ class SubscriptionService {
       'recommendation': 'Tax deduction calculated: \$' + totalExpenseDeductionUsd.toStringAsFixed(2) + ' for ' + roundTripMiles.toStringAsFixed(1) + ' miles travel (Estimated tax savings: \$' + estimatedTaxSavingsUsd.toStringAsFixed(2) + ').'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryCommissionExpiryAndRenewalStatus({
+    required DateTime commissionExpiryDate,
+    int warningThresholdDays = 60,
+    double renewalFeeUsd = 45.0,
+    double bondInsuranceFeeUsd = 50.0,
+  }) {
+    final now = DateTime.now();
+    final daysRemaining = commissionExpiryDate.difference(now).inDays;
+    final totalRenewalCostUsd = ((renewalFeeUsd + bondInsuranceFeeUsd) * 100).round() / 100;
+
+    bool isExpired = daysRemaining < 0;
+    bool isRenewalWindowOpen = daysRemaining <= warningThresholdDays && !isExpired;
+
+    String statusTier = 'COMMISSION_ACTIVE_VALID';
+    if (isExpired) {
+      statusTier = 'COMMISSION_EXPIRED_RENEWAL_REQUIRED';
+    } else if (isRenewalWindowOpen) {
+      statusTier = 'COMMISSION_RENEWAL_WINDOW_OPEN';
+    }
+
+    return {
+      'valid': true,
+      'commissionExpiryDate': commissionExpiryDate.toIso8601String().split('T')[0],
+      'daysRemaining': daysRemaining,
+      'isExpired': isExpired,
+      'isRenewalWindowOpen': isRenewalWindowOpen,
+      'totalRenewalCostUsd': totalRenewalCostUsd,
+      'statusTier': statusTier,
+      'recommendation': isExpired
+          ? 'COMMISSION EXPIRED! Cease notarizations immediately until state commission renewal is approved.'
+          : isRenewalWindowOpen
+          ? 'Notary commission renewal window open (${daysRemaining} days remaining). Estimated renewal cost: \$${totalRenewalCostUsd.toStringAsFixed(2)}.'
+          : 'Notary commission active and valid (${daysRemaining} days remaining).'
+    };
+  }
 }
 
 
