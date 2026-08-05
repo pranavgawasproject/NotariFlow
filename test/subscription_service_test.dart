@@ -349,6 +349,32 @@ void main() {
       expect(resExpired['statusTier'], equals('COMMISSION_EXPIRED_RENEWAL_REQUIRED'));
       expect(resExpired['recommendation'], contains('COMMISSION EXPIRED'));
     });
+
+    test('calculateNotaryDocumentRetentionAndArchivalAudit evaluates active and expired retention periods correctly', () {
+      final now = DateTime(2026, 8, 5);
+      final docDate = DateTime(2022, 8, 5);
+      final res = SubscriptionService.calculateNotaryDocumentRetentionAndArchivalAudit(
+        requiredRetentionYears: 10,
+        documentCreationDate: docDate,
+        isDigitallyBackedUp: true,
+        customCurrentDate: now,
+      );
+
+      expect(res['valid'], equals(true));
+      expect(res['requiredRetentionYears'], equals(10));
+      expect(res['daysRemaining'], equals(2191));
+      expect(res['isRetentionActive'], equals(true));
+      expect(res['archivalTier'], equals('MANDATORY_RETENTION_ACTIVE'));
+      expect(res['auditScore'], equals(100));
+
+      final inv = SubscriptionService.calculateNotaryDocumentRetentionAndArchivalAudit(
+        requiredRetentionYears: 0,
+        documentCreationDate: docDate,
+        isDigitallyBackedUp: true,
+      );
+      expect(inv['valid'], equals(false));
+      expect(inv['error'], equals('Required retention years must be a positive integer'));
+    });
   });
 }
 

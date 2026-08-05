@@ -1888,7 +1888,55 @@ class SubscriptionService {
           : 'Notary commission active and valid (${daysRemaining} days remaining).'
     };
   }
+
+  static Map<String, dynamic> calculateNotaryDocumentRetentionAndArchivalAudit({
+    required int requiredRetentionYears,
+    required DateTime documentCreationDate,
+    required bool isDigitallyBackedUp,
+    DateTime? customCurrentDate,
+  }) {
+    if (requiredRetentionYears <= 0) {
+      return {'valid': false, 'error': 'Required retention years must be a positive integer'};
+    }
+
+    final now = customCurrentDate ?? DateTime.now();
+    final retentionEndDate = DateTime(
+      documentCreationDate.year + requiredRetentionYears,
+      documentCreationDate.month,
+      documentCreationDate.day,
+    );
+
+    final daysRemaining = retentionEndDate.difference(now).inDays;
+    final isRetentionActive = daysRemaining > 0;
+
+    String archivalTier = 'MANDATORY_RETENTION_ACTIVE';
+    if (!isRetentionActive) {
+      archivalTier = 'RETENTION_PERIOD_EXPIRED_ELIGIBLE_FOR_PURGE';
+    } else if (daysRemaining <= 90) {
+      archivalTier = 'RETENTION_EXPIRING_SOON';
+    }
+
+    int auditScore = 100;
+    if (!isDigitallyBackedUp) auditScore -= 30;
+    if (!isRetentionActive) auditScore = 50;
+
+    return {
+      'valid': true,
+      'requiredRetentionYears': requiredRetentionYears,
+      'documentCreationDate': documentCreationDate.toIso8601String().split('T')[0],
+      'retentionEndDate': retentionEndDate.toIso8601String().split('T')[0],
+      'daysRemaining': daysRemaining,
+      'isRetentionActive': isRetentionActive,
+      'isDigitallyBackedUp': isDigitallyBackedUp,
+      'auditScore': auditScore,
+      'archivalTier': archivalTier,
+      'recommendation': isRetentionActive
+          ? 'Mandatory document retention active (${daysRemaining} days remaining of $requiredRetentionYears-year statutory requirement).'
+          : 'Statutory retention period expired. Record eligible for secure archival purge per state guidelines.'
+    };
+  }
 }
+
 
 
 
