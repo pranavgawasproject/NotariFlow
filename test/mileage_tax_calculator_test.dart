@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import '../lib/utils/mileage_tax_calculator.dart';
+import 'package:notariflow/utils/mileage_tax_calculator.dart';
 
 void main() {
   group('MileageTaxCalculator Tests', () {

@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:notari_flow/utils/subscription_service.dart';
+import 'package:notariflow/utils/subscription_service.dart';
 
 void main() {
   group('SubscriptionService - Loan Signing Batch Profitability', () {

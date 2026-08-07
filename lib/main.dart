@@ -937,7 +937,8 @@ class DashboardScreen extends StatelessWidget {
                 double paidIncome = 0;
 
                 for (var doc in invoices) {
-                  final amount = (doc['amount'] as num).toDouble();
+                  final data = doc.data() as Map<String, dynamic>;
+                  final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
                   totalIncome += amount;
                   if (doc['status'] == 'Pending') pendingIncome += amount;
                   if (doc['status'] == 'Paid') paidIncome += amount;
@@ -945,12 +946,14 @@ class DashboardScreen extends StatelessWidget {
 
                 double totalExpenses = 0;
                 for (var doc in expenses) {
-                  totalExpenses += (doc['amount'] as num).toDouble();
+                  final data = doc.data() as Map<String, dynamic>;
+                  totalExpenses += (data['amount'] as num?)?.toDouble() ?? 0.0;
                 }
 
                 double totalMiles = 0;
                 for (var doc in trips) {
-                  totalMiles += (doc['miles'] as num).toDouble();
+                  final data = doc.data() as Map<String, dynamic>;
+                  totalMiles += (data['miles'] as num?)?.toDouble() ?? 0.0;
                 }
                 double taxDed = totalMiles * 0.67;
                 
@@ -1387,12 +1390,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         Map<String, int> statusCounts = {'Paid': 0, 'Pending': 0, 'Overdue': 0};
 
         for (var doc in invoices) {
-          final date = doc['date'] as String;
-          final amount = (doc['amount'] as num).toDouble();
-          final status = doc['status'] as String;
+          final data = doc.data() as Map<String, dynamic>;
+          final date = data['date'] as String? ?? '';
+          final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+          final status = data['status'] as String? ?? 'Pending';
 
           // Extract month (e.g., "2025-01")
-          final monthKey = date.substring(0, 7);
+          final monthKey = date.length >= 7 ? date.substring(0, 7) : 'Unknown';
           monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] ?? 0) + amount;
 
           statusCounts[status] = (statusCounts[status] ?? 0) + 1;
