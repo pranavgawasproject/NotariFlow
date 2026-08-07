@@ -1,8 +1,6 @@
 # 📓 NotariFlow
 
-> **Flutter app for personal journaling, calendar planning, and expense tracking** — backed by Firebase. Scan receipts with ML Kit, sign documents, generate PDFs, chart your spending.
-
-> The previous README was a one-line header followed by ad-hoc shell commands. This version is the real one.
+> **Professional Mobile Notary Public Journal, Mileage Tracking, Compliance, and Business Management App** — backed by Firebase. Scan IDs with ML Kit, capture digital signatures, generate PDFs, and track mileage & expenses.
 
 ---
 
